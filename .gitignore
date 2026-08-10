@@ -14,3 +14,6 @@ config/viatom-o2ring-daemon.ini
 *.db
 *.db-journal
 *.log
+
+# Stray editor/tool backup files
+*.backup
