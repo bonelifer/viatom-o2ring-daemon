@@ -4,6 +4,8 @@ from dataclasses import replace
 
 from viatom_o2ring_daemon.config import DEFAULT_PROFILE_CONFIG, DEFAULT_REPORT_CONFIG
 from viatom_o2ring_daemon.report import (
+    ReportRow,
+    _address_lines,
     _apply_profile_overrides,
     build_csv,
     build_pdf,
@@ -16,6 +18,21 @@ from viatom_o2ring_daemon.report import (
 from viatom_o2ring_daemon.storage import ReadingStore
 
 _ADDRESS = "AA:BB:CC:DD:EE:FF"
+_OTHER_ADDRESS = "11:22:33:44:55:66"
+
+
+def _row(address=_ADDRESS):
+    return ReportRow(
+        recorded_at=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        address=address,
+        spo2=97,
+        pulse_bpm=68,
+        battery=80,
+        battery_state=0,
+        perfusion_index=8,
+        worn=True,
+        calibrating=False,
+    )
 
 
 class _FakeHeader:
@@ -234,3 +251,27 @@ def test_apply_profile_overrides_explicit_field_wins_over_region():
     result = _apply_profile_overrides(base, profile)
     assert result.date_format == "us"  # from region
     assert result.page_size == "a4"  # explicit override wins over region's "letter"
+
+
+def test_address_lines_empty():
+    assert _address_lines([]) == []
+
+
+def test_address_lines_single_address():
+    rows = [_row(), _row()]
+    assert _address_lines(rows) == [f"Address: {_ADDRESS}"]
+
+
+def test_address_lines_multiple_addresses():
+    rows = [_row(_ADDRESS), _row(_OTHER_ADDRESS)]
+    lines = _address_lines(rows)
+    assert lines[0] == "Addresses:"
+    assert f"&nbsp;&nbsp;{_ADDRESS}" in lines
+    assert f"&nbsp;&nbsp;{_OTHER_ADDRESS}" in lines
+
+
+def test_build_pdf_multiple_addresses_renders(tmp_path):
+    rows = [_row(_ADDRESS), _row(_OTHER_ADDRESS)]
+    output = str(tmp_path / "multi-address.pdf")
+    build_pdf(rows, output, DEFAULT_REPORT_CONFIG)
+    assert (tmp_path / "multi-address.pdf").stat().st_size > 0

@@ -394,10 +394,14 @@ def _header_style_commands() -> list[tuple]:
 
 
 def _build_table(rows: list[ReportRow], report_config: ReportConfig) -> Table:
-    """Build the PDF reading table, with rows shaded by SpO2 category."""
+    """Build the PDF reading table, with rows shaded by SpO2 category.
+
+    The device address isn't a column here -- see ``_address_elements``,
+    which prints it once in the header instead, since it's constant across
+    a report's rows far more often than not (one daemon instance already
+    targets one device) and repeating it on every row wasted table width.
+    """
     header = ["Date/Time (local)"]
-    if report_config.include_address:
-        header.append("Address")
     numeric_start = len(header)
     header.extend(["SpO2\n(%)", "Pulse\n(bpm)", "Battery\n(%)"])
     if report_config.include_categories:
@@ -410,8 +414,6 @@ def _build_table(rows: list[ReportRow], report_config: ReportConfig) -> Table:
         categories.append(category)
 
         values: list[object] = [_format_datetime(row.recorded_at, report_config.date_format)]
-        if report_config.include_address:
-            values.append(row.address)
         values.extend(
             [
                 row.spo2 if row.spo2 is not None else "-",
@@ -706,6 +708,30 @@ def _build_trend_chart(
     return drawing
 
 
+def _address_lines(rows: list[ReportRow]) -> list[str]:
+    """Build one "Address: <address>" line per distinct device address in the rows.
+
+    Almost always just one line -- a daemon instance already targets a
+    single device -- but the database can in principle hold more than one
+    address (e.g. reused across a device swap; see ``fetch_rows``), so this
+    doesn't just assume the first row's address applies to the whole report.
+
+    Args:
+        rows: Reading rows to include.
+
+    Returns:
+        Text lines, empty if ``rows`` is empty. A single address renders as
+        one "Address: ..." line; more than one renders as "Addresses:"
+        followed by one indented line per address.
+    """
+    addresses = sorted({row.address for row in rows})
+    if not addresses:
+        return []
+    if len(addresses) == 1:
+        return [f"Address: {addresses[0]}"]
+    return ["Addresses:"] + [f"&nbsp;&nbsp;{address}" for address in addresses]
+
+
 def _summary_lines(rows: list[ReportRow], report_config: ReportConfig) -> list[str]:
     """Build min/max/average text lines for SpO2, pulse, and category breakdown."""
     spo2_values = [row.spo2 for row in rows if row.spo2 is not None]
@@ -766,6 +792,10 @@ def build_pdf(
             styles["Normal"],
         ),
     ]
+    if report_config.include_address:
+        elements.extend(
+            Paragraph(line, styles["Normal"]) for line in _address_lines(rows)
+        )
     if profile_config.name:
         elements.append(Paragraph(f"Wearer: {escape(profile_config.name)}", styles["Normal"]))
     if profile_config.email:
