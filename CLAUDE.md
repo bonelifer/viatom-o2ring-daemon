@@ -31,6 +31,26 @@
   (`etekcity-bp-daemon`, `trividia-truemetrix-daemon`, and this one) was
   deliberately modeled on. Not a code dependency, just a design reference.
 
+## Deliberately not implemented
+
+- **Goal-progress/trend report section** (an SpO2-floor analog to
+  `etekcity-bp-daemon`'s `include_goal_progress`: current average vs. a
+  doctor-set target, with a trending-toward/away-from-goal line based on a
+  linear fit across the report's date range) -- considered and rejected,
+  not just unbuilt. BP's version works because a sustained multi-week drop
+  in average systolic/diastolic is a genuine treatment-response signal
+  (weight loss, meds, diet adherence). A week-to-week SpO2 average doesn't
+  have that property -- it's dominated by sensor positioning and
+  night-to-night noise rather than something a person is "working toward,"
+  so a linear trend line would risk implying an improving/worsening
+  narrative that isn't physiologically real. `alerting.low_spo2_percent`
+  already covers the actionable case (a specific reading crossed the
+  floor) more honestly than a smoothed average-vs-goal chart would. If
+  this comes up again, a stripped-down "current period avg vs. floor" with
+  no trend line would be the fallback worth considering -- the trend-fit
+  part specifically is the rejected piece, not the goal-display concept
+  entirely.
+
 ## Verification status
 
 **Work in progress -- not yet verified against real hardware**, inherited
