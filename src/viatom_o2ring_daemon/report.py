@@ -97,6 +97,16 @@ class SessionRow:
     steps: int
 
 
+@dataclass
+class SessionRecordRow:
+    """One raw per-sample record from a downloaded session, as read back from the database."""
+
+    time: datetime
+    spo2: int
+    heart_rate: int
+    acceleration: int
+
+
 def _resolve_range(
     period: str, from_date: str | None, to_date: str | None
 ) -> tuple[datetime | None, datetime | None]:
@@ -245,6 +255,56 @@ def fetch_sessions(
         connection.close()
 
 
+def fetch_session_records(
+    db_path: str, filename: str, address: str | None = None
+) -> list[SessionRecordRow]:
+    """Query one downloaded session's raw per-sample records.
+
+    The session summary (see ``fetch_sessions``) is a rollup; this is the
+    underlying every-2-or-4-seconds data it was computed from, for anyone
+    who wants to actually plot or re-analyze a specific overnight/session
+    recording rather than just see its summary stats.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        filename: The device-assigned file name (e.g. "20260116233312.vld").
+        address: Disambiguate if the same filename was ever downloaded from
+            more than one device's address, if given.
+
+    Returns:
+        Matching records ordered oldest first, empty if no session matches
+        ``filename`` (and ``address``, if given). ``time`` is the device's
+        own clock (naive, not UTC-normalized -- see ``fetch_sessions``), so
+        it's rendered as-is rather than converted with ``astimezone()``.
+    """
+    query = (
+        "SELECT session_records.time, session_records.spo2, "
+        "session_records.heart_rate, session_records.acceleration "
+        "FROM session_records JOIN sessions ON sessions.id = session_records.session_id "
+        "WHERE sessions.filename = ?"
+    )
+    params: list[str] = [filename]
+    if address:
+        query += " AND sessions.address = ?"
+        params.append(address)
+    query += " ORDER BY session_records.time ASC"
+
+    connection = sqlite3.connect(db_path)
+    try:
+        cursor = connection.execute(query, params)
+        return [
+            SessionRecordRow(
+                time=datetime.fromisoformat(row[0]),
+                spo2=row[1],
+                heart_rate=row[2],
+                acceleration=row[3],
+            )
+            for row in cursor.fetchall()
+        ]
+    finally:
+        connection.close()
+
+
 def _apply_profile_overrides(
     report_config: ReportConfig, profile_config: ProfileConfig
 ) -> ReportConfig:
@@ -286,6 +346,27 @@ def build_csv(rows: list[ReportRow], output_path: str, report_config: ReportConf
                 values.append(classify(row.spo2) or "")
             values.extend(["yes" if row.worn else "no", "yes" if row.calibrating else "no"])
             writer.writerow(values)
+
+
+def build_session_records_csv(records: list[SessionRecordRow], output_path: str) -> None:
+    """Write one session's raw per-sample records to a CSV file.
+
+    Args:
+        records: Records to include, oldest first (see ``fetch_session_records``).
+        output_path: Filesystem path to write the CSV to.
+    """
+    with open(output_path, "w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["Time (device clock)", "SpO2 (%)", "Heart Rate (bpm)", "Acceleration"])
+        for record in records:
+            writer.writerow(
+                [
+                    record.time.strftime("%Y-%m-%d %H:%M:%S"),
+                    record.spo2,
+                    record.heart_rate,
+                    record.acceleration,
+                ]
+            )
 
 
 def _header_style_commands() -> list[tuple]:
@@ -756,6 +837,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-a", "--address", help="Restrict the report to one device's BLE address"
     )
+    parser.add_argument(
+        "-s",
+        "--export-session",
+        dest="export_session",
+        metavar="FILENAME",
+        help=(
+            "Export one downloaded session's raw per-sample records "
+            "(e.g. 20260116233312.vld) as CSV instead of generating a "
+            "reading report. Ignores --format/--period/--from/--to; "
+            "--output still applies (default: <FILENAME>-records.csv)"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -783,6 +876,16 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     ensure_schema(db_path)
+
+    if args.export_session:
+        records = fetch_session_records(db_path, args.export_session, args.address)
+        if not records:
+            print(f"No session found matching filename {args.export_session!r}.")
+            return 1
+        output = args.output or f"{args.export_session}-records.csv"
+        build_session_records_csv(records, output)
+        print(f"Wrote {len(records)} record(s) to {output}")
+        return 0
 
     start, end = _resolve_range(args.period, args.from_date, args.to_date)
     output = args.output or f"o2ring-report.{args.format}"
