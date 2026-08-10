@@ -28,6 +28,9 @@ stale relative to what the code actually produces.
 Every sample except the toggle demos above includes the SpO2-category pie
 chart, the SpO2/pulse trend charts, the summary line, and the downloaded-
 session summary table; only the specific toggle each demonstrates differs.
+`include_address` (on in every sample but `full-minimal.pdf`) prints an
+"Address:" line in the header rather than a table column -- see
+`full-world.pdf`'s header vs. its reading table.
 
 The fixture's one downloaded session isn't exported anywhere in these
 samples -- see [Exporting a session's raw records](../README.md#exporting-a-sessions-raw-records)

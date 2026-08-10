@@ -29,7 +29,7 @@ class DaemonConfig:
 class ReportConfig:
     """Parsed [report] section controlling PDF/CSV report rendering."""
 
-    include_address: bool
+    include_address: bool  # PDF: header line(s); CSV: a column (constant per report either way)
     include_summary: bool
     include_categories: bool
     include_sessions: bool

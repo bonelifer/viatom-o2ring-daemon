@@ -39,7 +39,10 @@ log_level = INFO
 enabled = yes
 
 [report]
-# Include the device's BLE address as a column/field.
+# Include the device's BLE address. PDF: one "Address:" line in the header
+# (not a table column -- it's constant across a report far more often than
+# not, so repeating it on every row would just waste table width). CSV:
+# still a column, since CSV has no header/table split to move it into.
 include_address = yes
 
 # Print an avg/min/max summary and SpO2 category breakdown below the title.
