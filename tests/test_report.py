@@ -1,10 +1,58 @@
 import csv
+import datetime
 
 from viatom_o2ring_daemon.config import DEFAULT_REPORT_CONFIG
-from viatom_o2ring_daemon.report import build_csv, build_pdf, fetch_rows, fetch_sessions
+from viatom_o2ring_daemon.report import (
+    build_csv,
+    build_pdf,
+    build_session_records_csv,
+    fetch_rows,
+    fetch_session_records,
+    fetch_sessions,
+    main,
+)
 from viatom_o2ring_daemon.storage import ReadingStore
 
 _ADDRESS = "AA:BB:CC:DD:EE:FF"
+
+
+class _FakeHeader:
+    def __init__(self):
+        self.start_time = datetime.datetime(2026, 1, 16, 23, 33, 12)
+        self.mode = 1
+        self.duration_seconds = 8
+        self.spo2_avg = 96
+        self.spo2_min = 90
+        self.spo2_below_3pct_events = 0
+        self.spo2_below_4pct_events = 0
+        self.seconds_below_90pct = 0
+        self.events_below_90pct = 0
+        self.percent_below_90pct = 0.0
+        self.o2_score = 9.0
+        self.steps = 100
+        self.record_count = 2
+        self.resolution_seconds = 4.0
+
+
+class _FakeRecord:
+    def __init__(self, time, spo2, heart_rate, acceleration):
+        self.time = time
+        self.spo2 = spo2
+        self.heart_rate = heart_rate
+        self.acceleration = acceleration
+
+
+def _seed_session(tmp_path, db_path):
+    store = ReadingStore(db_path)
+    header = _FakeHeader()
+    records = [
+        _FakeRecord(header.start_time, 96, 70, 1),
+        _FakeRecord(header.start_time + datetime.timedelta(seconds=4), 94, 72, 2),
+    ]
+    store.record_session(
+        _ADDRESS, "20260116233312.vld", "2026-01-17T08:00:00+00:00", header, records
+    )
+    store.close()
 
 
 def _seed(tmp_path):
@@ -95,3 +143,63 @@ def test_build_pdf_empty_rows(tmp_path):
     output = str(tmp_path / "empty.pdf")
     build_pdf([], output, DEFAULT_REPORT_CONFIG)
     assert (tmp_path / "empty.pdf").stat().st_size > 0
+
+
+def test_fetch_session_records(tmp_path):
+    db_path = _seed(tmp_path)
+    _seed_session(tmp_path, db_path)
+
+    records = fetch_session_records(db_path, "20260116233312.vld")
+    assert len(records) == 2
+    assert records[0].spo2 == 96
+    assert records[1].spo2 == 94
+    assert records[0].time < records[1].time
+
+
+def test_fetch_session_records_unknown_filename(tmp_path):
+    db_path = _seed(tmp_path)
+    _seed_session(tmp_path, db_path)
+    assert fetch_session_records(db_path, "nonexistent.vld") == []
+
+
+def test_fetch_session_records_filters_by_address(tmp_path):
+    db_path = _seed(tmp_path)
+    _seed_session(tmp_path, db_path)
+    assert fetch_session_records(db_path, "20260116233312.vld", address="00:00:00:00:00:00") == []
+    assert len(fetch_session_records(db_path, "20260116233312.vld", address=_ADDRESS)) == 2
+
+
+def test_build_session_records_csv(tmp_path):
+    db_path = _seed(tmp_path)
+    _seed_session(tmp_path, db_path)
+    records = fetch_session_records(db_path, "20260116233312.vld")
+
+    output = str(tmp_path / "records.csv")
+    build_session_records_csv(records, output)
+
+    with open(output, newline="") as f:
+        reader = list(csv.reader(f))
+    assert reader[0] == ["Time (device clock)", "SpO2 (%)", "Heart Rate (bpm)", "Acceleration"]
+    assert len(reader) == 3  # header + 2 records
+    assert reader[1][1] == "96"
+
+
+def test_cli_export_session(tmp_path):
+    db_path = _seed(tmp_path)
+    _seed_session(tmp_path, db_path)
+    output = str(tmp_path / "records.csv")
+
+    exit_code = main(
+        ["--db", db_path, "--export-session", "20260116233312.vld", "--output", output]
+    )
+    assert exit_code == 0
+
+    with open(output, newline="") as f:
+        reader = list(csv.reader(f))
+    assert len(reader) == 3
+
+
+def test_cli_export_session_unknown_filename(tmp_path):
+    db_path = _seed(tmp_path)
+    exit_code = main(["--db", db_path, "--export-session", "nonexistent.vld"])
+    assert exit_code == 1

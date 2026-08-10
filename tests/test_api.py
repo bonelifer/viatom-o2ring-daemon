@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 from dataclasses import replace
 
 from aiohttp.test_utils import TestClient, TestServer
@@ -25,6 +26,47 @@ def _make_db(tmp_path):
         recorded_at="2026-01-01T00:00:00+00:00", address=_ADDRESS, spo2=97,
         pulse_bpm=68, battery=80, battery_state=0, perfusion_index=8,
         worn=True, calibrating=False,
+    )
+    store.close()
+    return db_path
+
+
+class _FakeHeader:
+    def __init__(self):
+        self.start_time = datetime.datetime(2026, 1, 16, 23, 33, 12)
+        self.mode = 1
+        self.duration_seconds = 8
+        self.spo2_avg = 96
+        self.spo2_min = 90
+        self.spo2_below_3pct_events = 0
+        self.spo2_below_4pct_events = 0
+        self.seconds_below_90pct = 0
+        self.events_below_90pct = 0
+        self.percent_below_90pct = 0.0
+        self.o2_score = 9.0
+        self.steps = 100
+        self.record_count = 2
+        self.resolution_seconds = 4.0
+
+
+class _FakeRecord:
+    def __init__(self, time, spo2, heart_rate, acceleration):
+        self.time = time
+        self.spo2 = spo2
+        self.heart_rate = heart_rate
+        self.acceleration = acceleration
+
+
+def _make_db_with_session(tmp_path):
+    db_path = _make_db(tmp_path)
+    store = ReadingStore(db_path)
+    header = _FakeHeader()
+    records = [
+        _FakeRecord(header.start_time, 96, 70, 1),
+        _FakeRecord(header.start_time + datetime.timedelta(seconds=4), 94, 72, 2),
+    ]
+    store.record_session(
+        _ADDRESS, "20260116233312.vld", "2026-01-17T08:00:00+00:00", header, records
     )
     store.close()
     return db_path
@@ -124,6 +166,56 @@ def test_report_no_data(tmp_path):
         async with TestClient(TestServer(app)) as client:
             resp = await client.get("/report?format=pdf")
             assert resp.status == 404
+
+    _run(scenario())
+
+
+def test_session_records_requires_filename(tmp_path):
+    app = _build(_make_db(tmp_path))
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/session-records")
+            assert resp.status == 400
+
+    _run(scenario())
+
+
+def test_session_records_unknown_filename(tmp_path):
+    app = _build(_make_db(tmp_path))
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/session-records?filename=nonexistent.vld")
+            assert resp.status == 404
+
+    _run(scenario())
+
+
+def test_session_records_json(tmp_path):
+    app = _build(_make_db_with_session(tmp_path))
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/session-records?filename=20260116233312.vld")
+            assert resp.status == 200
+            body = await resp.json()
+            assert len(body) == 2
+            assert body[0]["spo2"] == 96
+
+    _run(scenario())
+
+
+def test_session_records_csv(tmp_path):
+    app = _build(_make_db_with_session(tmp_path))
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/session-records?filename=20260116233312.vld&format=csv")
+            assert resp.status == 200
+            assert resp.content_type == "text/csv"
+            body = await resp.text()
+            assert "SpO2 (%)" in body
 
     _run(scenario())
 

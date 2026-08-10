@@ -228,11 +228,13 @@ Endpoints:
 | `GET /health` | Unauthenticated liveness check: `{"status": "ok", "version": "..."}`. |
 | `GET /latest[?address=...]` | Most recent live reading, as JSON. |
 | `GET /sessions[?address=...&limit=...]` | Most recently downloaded sessions, newest first, as JSON. |
+| `GET /session-records?filename=...[&address=...&format=json\|csv]` | One session's raw per-sample records (the every-2-or-4-seconds data behind its summary). JSON by default; `format=csv` returns a file download. |
 | `GET /report[?format=pdf\|csv&period=...&from=...&to=...&address=...]` | Generates a report on demand using the same `[report]` config as `viatom-o2ring-report`, returned as a file download. |
 
 ```bash
 curl http://127.0.0.1:8080/latest
 curl -o report.pdf "http://127.0.0.1:8080/report?period=30d"
+curl -o session.csv "http://127.0.0.1:8080/session-records?filename=20260116233312.vld&format=csv"
 ```
 
 **There's no TLS built in.** `host` defaults to `127.0.0.1` (loopback only)
@@ -404,6 +406,25 @@ the category distribution.
 
 See [samples/single/](samples/single/) for a rendered PDF of every layout/
 date-format combination.
+
+### Exporting a session's raw records
+
+The sessions table/summary shows avg/min SpO2, desaturation event counts,
+and so on for each downloaded `.vld` file, but that's a rollup. To get the
+underlying every-2-or-4-seconds data behind one specific session (e.g. to
+plot an overnight recording yourself), export it as CSV instead of
+generating a reading report:
+
+```bash
+viatom-o2ring-report --config /etc/viatom-o2ring-daemon/config.ini \
+  --export-session 20260116233312.vld --output session.csv
+```
+
+`--export-session` ignores `--format`/`--period`/`--from`/`--to` -- it
+always writes CSV, and `--output` still applies (default:
+`<filename>-records.csv`). The same data is available live via the HTTP
+API's `GET /session-records?filename=...` (JSON by default, `format=csv`
+for a file download); see [HTTP API](#http-api).
 
 ## Pruning old data
 

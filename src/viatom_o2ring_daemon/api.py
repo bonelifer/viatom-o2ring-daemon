@@ -29,12 +29,15 @@ from .report import (
     _resolve_range,
     build_csv,
     build_pdf,
+    build_session_records_csv,
     fetch_rows,
+    fetch_session_records,
     fetch_sessions,
 )
 from .storage import ensure_schema
 
 _VALID_FORMATS = ("pdf", "csv")
+_VALID_RECORD_FORMATS = ("json", "csv")
 _VALID_PERIODS = ("7d", "30d", "90d", "1y", "all")
 
 _LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
@@ -176,6 +179,65 @@ async def handle_sessions(request: web.Request) -> web.Response:
     return web.json_response(sessions)
 
 
+async def handle_session_records(request: web.Request) -> web.Response:
+    """GET /session-records?filename=...[&address=...&format=json|csv].
+
+    Returns one downloaded session's raw per-sample records -- the
+    every-2-or-4-seconds data the /sessions summary was computed from.
+    Defaults to JSON; ``format=csv`` returns a file download instead,
+    matching what ``viatom-o2ring-report --export-session`` writes.
+    """
+    unauthorized = _require_auth(request)
+    if unauthorized is not None:
+        return unauthorized
+
+    filename = request.query.get("filename")
+    if not filename:
+        return web.json_response({"error": "filename is required"}, status=400)
+
+    fmt = request.query.get("format", "json")
+    if fmt not in _VALID_RECORD_FORMATS:
+        return web.json_response(
+            {"error": f"format must be one of {_VALID_RECORD_FORMATS}"}, status=400
+        )
+
+    records = fetch_session_records(
+        request.app["db_path"], filename, request.query.get("address")
+    )
+    if not records:
+        return web.json_response(
+            {"error": f"no session found matching filename {filename!r}"}, status=404
+        )
+
+    if fmt == "json":
+        return web.json_response(
+            [
+                {
+                    "time": record.time.isoformat(),
+                    "spo2": record.spo2,
+                    "heart_rate": record.heart_rate,
+                    "acceleration": record.acceleration,
+                }
+                for record in records
+            ]
+        )
+
+    fd, temp_path = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    try:
+        build_session_records_csv(records, temp_path)
+        with open(temp_path, "rb") as csv_file:
+            body = csv_file.read()
+    finally:
+        os.remove(temp_path)
+
+    return web.Response(
+        body=body,
+        content_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}-records.csv"'},
+    )
+
+
 async def handle_report(request: web.Request) -> web.Response:
     """GET /report[?format=pdf|csv&period=...&from=...&to=...&address=...].
 
@@ -256,6 +318,7 @@ def build_app(
     app.router.add_get("/health", handle_health)
     app.router.add_get("/latest", handle_latest)
     app.router.add_get("/sessions", handle_sessions)
+    app.router.add_get("/session-records", handle_session_records)
     app.router.add_get("/report", handle_report)
     return app
 
