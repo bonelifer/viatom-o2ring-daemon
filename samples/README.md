@@ -1,36 +1,34 @@
 # Sample reports
 
-PDF reports generated from a synthetic fixture (200 live readings over
-~10 hours, SpO2 ranging 85-98%) using every `report.table_layout` /
-`report.date_format` combination, via:
+PDF reports generated from a fixed, deterministic fixture (20 live readings
+across four weeks, drifting from Normal down through Mild/Moderate
+hypoxemia and back, plus one downloaded overnight session) via:
 
-```ini
-[report]
-table_layout = full   # or compact, rollup
-date_format = world    # or us
+```bash
+./scripts/generate-samples.py
 ```
 
-| File | table_layout | date_format |
-|---|---|---|
-| `full-world.pdf` | full | world |
-| `full-us.pdf` | full | us |
-| `compact-world.pdf` | compact | world |
-| `compact-us.pdf` | compact | us |
-| `rollup-world.pdf` | rollup | world |
-| `rollup-us.pdf` | rollup | us |
+Run this after any change to `report.py`'s rendering, so these don't go
+stale relative to what the code actually produces.
 
-Every sample includes the SpO2-category pie chart and the SpO2/pulse trend
-charts (`report.include_chart = yes`) and the summary line
-(`report.include_summary = yes`); only the reading table's shape differs.
-None include a `sessions` table, since the fixture has no downloaded `.vld`
-files -- `report.include_sessions = yes` adds one automatically once
-sessions exist in the database.
+| File | Demonstrates |
+|---|---|
+| `full-world.pdf` | `table_layout = full`, `date_format = world` (the default shape) |
+| `full-us.pdf` | `table_layout = full`, `date_format = us` |
+| `compact-world.pdf` | `table_layout = compact`, `date_format = world` |
+| `compact-us.pdf` | `table_layout = compact`, `date_format = us` |
+| `rollup-world.pdf` | `table_layout = rollup`, `date_format = world` (one row per week) |
+| `rollup-us.pdf` | `table_layout = rollup`, `date_format = us` |
+| `full-minimal.pdf` | `include_address`/`include_categories`/`include_summary`/`include_sessions = no` |
+| `chart-only.pdf` | `include_table`/`include_sessions = no` |
+| `table-only.pdf` | `include_chart`/`include_sessions = no` |
+| `full-world-with-notes.pdf` | a `[profile]` section set (`name`, `email`, `notes`), showing the Wearer/Email/Notes lines below the generated-timestamp line -- handy for handing a printed report to a doctor |
 
-`full-world-with-notes.pdf` is the same `full`/`world` fixture rendered
-with a `[profile]` section set (`name`, `email`, `notes`), to show the
-Wearer/Email/Notes lines that print below the generated-timestamp line
-when those fields are configured -- normally handy for handing a printed
-report to a doctor.
+Every sample except the toggle demos above includes the SpO2-category pie
+chart, the SpO2/pulse trend charts, the summary line, and the downloaded-
+session summary table; only the specific toggle each demonstrates differs.
 
-Regenerate with `viatom-o2ring-report` against your own database, or see
-`scripts/make-fixture-db.py` for a minimal fixture to build one.
+The fixture's one downloaded session isn't exported anywhere in these
+samples -- see [Exporting a session's raw records](../README.md#exporting-a-sessions-raw-records)
+for `viatom-o2ring-report --export-session` and the `/session-records` API
+endpoint, which pull the same data these summary rows are rolled up from.
