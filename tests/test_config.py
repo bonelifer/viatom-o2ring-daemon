@@ -114,6 +114,18 @@ def test_load_profile_config(tmp_path):
     assert profile.apprise_urls == ["json://localhost"]
 
 
+def test_load_profile_config_percent_in_notes_does_not_crash(tmp_path):
+    # configparser treats "%" as interpolation syntax by default, which
+    # would break on a very plausible O2Ring notes value like this one --
+    # see config.py's ConfigParser(interpolation=None).
+    config_path = _write(
+        tmp_path,
+        _BASE_CONFIG + "\n[profile]\nnotes = target SpO2 >= 92%\n",
+    )
+    profile = load_profile_config(config_path)
+    assert profile.notes == "target SpO2 >= 92%"
+
+
 def test_load_mqtt_config_disabled_by_default(tmp_path):
     config_path = _write(tmp_path, _BASE_CONFIG)
     mqtt = load_mqtt_config(config_path)

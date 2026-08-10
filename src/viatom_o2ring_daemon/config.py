@@ -213,7 +213,7 @@ def load_config(config_path: str) -> DaemonConfig:
             "config/viatom-o2ring-daemon.ini.example to this path and edit it."
         )
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     monitor = parser["monitor"] if parser.has_section("monitor") else {}
@@ -267,7 +267,7 @@ def load_report_config(config_path: str) -> ReportConfig:
     if not path.is_file():
         raise ConfigError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     if not parser.has_section("report"):
@@ -345,7 +345,7 @@ def load_profile_config(config_path: str) -> ProfileConfig:
     if not path.is_file():
         raise ConfigError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     if not parser.has_section("profile"):
@@ -415,7 +415,7 @@ def load_mqtt_config(config_path: str) -> MqttConfig:
     if not path.is_file():
         raise ConfigError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     if not parser.has_section("mqtt"):
@@ -472,7 +472,7 @@ def load_alert_config(config_path: str) -> AlertConfig:
     if not path.is_file():
         raise ConfigError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     if not parser.has_section("alerting"):
@@ -546,7 +546,7 @@ def load_api_config(config_path: str) -> ApiConfig:
     if not path.is_file():
         raise ConfigError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     if not parser.has_section("api"):
@@ -584,7 +584,7 @@ def load_file_sync_config(config_path: str) -> FileSyncConfig:
     if not path.is_file():
         raise ConfigError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser(interpolation=None)
     parser.read(path)
 
     if not parser.has_section("file_sync"):
