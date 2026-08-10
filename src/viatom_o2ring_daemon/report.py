@@ -400,10 +400,13 @@ def _build_table(rows: list[ReportRow], report_config: ReportConfig) -> Table:
     which prints it once in the header instead, since it's constant across
     a report's rows far more often than not (one daemon instance already
     targets one device) and repeating it on every row wasted table width.
+    Battery isn't a column either -- it's a device/alerting concern (see
+    ``alerting.low_battery_percent``), not a clinically relevant per-reading
+    value, and CSV export still carries it for anyone who wants it.
     """
     header = ["Date/Time (local)"]
     numeric_start = len(header)
-    header.extend(["SpO2\n(%)", "Pulse\n(bpm)", "Battery\n(%)"])
+    header.extend(["SpO2\n(%)", "Pulse\n(bpm)"])
     if report_config.include_categories:
         header.append("Category")
 
@@ -418,14 +421,13 @@ def _build_table(rows: list[ReportRow], report_config: ReportConfig) -> Table:
             [
                 row.spo2 if row.spo2 is not None else "-",
                 row.pulse_bpm if row.pulse_bpm is not None else "-",
-                row.battery if row.battery is not None else "-",
             ]
         )
         if report_config.include_categories:
             values.append(category or "-")
         data.append(values)
 
-    numeric_cols = list(range(numeric_start, numeric_start + 3))
+    numeric_cols = list(range(numeric_start, numeric_start + 2))
     style_commands = _header_style_commands()
     style_commands.extend(("ALIGN", (idx, 1), (idx, -1), "RIGHT") for idx in numeric_cols)
     for row_index, category in enumerate(categories, start=1):
@@ -443,11 +445,11 @@ _COMPACT_LAYOUT_COLUMN_GROUPS = 2
 
 
 def _build_compact_table(rows: list[ReportRow], report_config: ReportConfig) -> Table:
-    """Build the compact layout: Date/SpO2/Pulse/Battery only, side by side."""
+    """Build the compact layout: Date/SpO2/Pulse only, side by side."""
     groups = min(_COMPACT_LAYOUT_COLUMN_GROUPS, len(rows))
     rows_per_column = -(-len(rows) // groups)  # ceil division
 
-    group_header = ["Date/Time", "SpO2 (%)", "Pulse", "Battery (%)"]
+    group_header = ["Date/Time", "SpO2 (%)", "Pulse"]
     header = group_header * groups
     data = [header]
     for r in range(rows_per_column):
@@ -459,12 +461,11 @@ def _build_compact_table(rows: list[ReportRow], report_config: ReportConfig) -> 
                 line.append(_format_datetime(row.recorded_at, report_config.date_format))
                 line.append(row.spo2 if row.spo2 is not None else "-")
                 line.append(row.pulse_bpm if row.pulse_bpm is not None else "-")
-                line.append(row.battery if row.battery is not None else "-")
             else:
-                line.extend(["", "", "", ""])
+                line.extend(["", "", ""])
         data.append(line)
 
-    align_cols = [i for i in range(len(header)) if i % 4 in (1, 2, 3)]
+    align_cols = [i for i in range(len(header)) if i % 3 in (1, 2)]
     style_commands = _header_style_commands()
     style_commands.extend(("ALIGN", (idx, 1), (idx, -1), "RIGHT") for idx in align_cols)
 

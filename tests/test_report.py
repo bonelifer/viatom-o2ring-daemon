@@ -7,6 +7,8 @@ from viatom_o2ring_daemon.report import (
     ReportRow,
     _address_lines,
     _apply_profile_overrides,
+    _build_compact_table,
+    _build_table,
     build_csv,
     build_pdf,
     build_session_records_csv,
@@ -275,3 +277,19 @@ def test_build_pdf_multiple_addresses_renders(tmp_path):
     output = str(tmp_path / "multi-address.pdf")
     build_pdf(rows, output, DEFAULT_REPORT_CONFIG)
     assert (tmp_path / "multi-address.pdf").stat().st_size > 0
+
+
+def test_build_table_has_no_battery_column():
+    rows = [_row()]
+    table = _build_table(rows, DEFAULT_REPORT_CONFIG)
+    header = table._cellvalues[0]
+    assert not any("Battery" in str(cell) for cell in header)
+    assert any("SpO2" in str(cell) for cell in header)
+    assert any("Pulse" in str(cell) for cell in header)
+
+
+def test_build_compact_table_has_no_battery_column():
+    rows = [_row()]
+    table = _build_compact_table(rows, DEFAULT_REPORT_CONFIG)
+    header = table._cellvalues[0]
+    assert not any("Battery" in str(cell) for cell in header)
