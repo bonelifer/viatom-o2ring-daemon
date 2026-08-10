@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from viatom_o2ring_ble import Reading, RtReading
+from viatom_o2ring_ble import OxyIIReading, Reading, RtReading
 
 from viatom_o2ring_daemon.cli import _check_config, _reading_to_row
 
@@ -43,11 +43,28 @@ def test_reading_to_row_legacy_reading():
     assert row["battery_state"] == 1
 
 
+def test_reading_to_row_oxyii_reading():
+    reading = OxyIIReading(
+        spo2=93, heart_rate=75, battery=64, motion=10, worn=True,
+        contact_state=1, file_handle_open=False, calibrating=False, raw=b"",
+        received_at=datetime.now(timezone.utc),
+    )
+    row = _reading_to_row(reading, _ADDRESS)
+    assert row["spo2"] == 93
+    assert row["pulse_bpm"] == 75
+    assert row["battery"] == 64
+    assert row["battery_state"] is None
+    assert row["perfusion_index"] is None
+    assert row["worn"] is True
+
+
 def test_check_config_valid(tmp_path, capsys):
     config_path = tmp_path / "config.ini"
     config_path.write_text(_BASE_CONFIG.format(db_path=tmp_path / "readings.db"))
     assert _check_config(str(config_path)) == 0
-    assert "OK" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "OK" in out
+    assert "protocol=legacy" in out
 
 
 def test_check_config_missing_file(capsys):

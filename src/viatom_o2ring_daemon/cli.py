@@ -13,7 +13,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import aiomqtt
-from viatom_o2ring_ble import O2RingClient, Reading, RtReading, discover
+from viatom_o2ring_ble import (
+    O2RingClient,
+    OxyIIClient,
+    OxyIIReading,
+    Reading,
+    RtReading,
+    discover,
+    discover_oxyii,
+)
 
 from ._version import __version__
 from .api import is_insecurely_exposed
@@ -38,11 +46,13 @@ from .storage import ReadingStore
 _LOGGER = logging.getLogger("viatom_o2ring_daemon")
 
 
-async def discover_device(timeout: float = 60.0) -> str:
-    """Scan for the first advertisement matching a supported O2Ring-family device.
+async def discover_device(timeout: float = 60.0, protocol: str = "legacy") -> str:
+    """Scan for the first advertisement matching a supported device.
 
     Args:
         timeout: Seconds to scan before giving up.
+        protocol: "legacy" (O2Ring/KidsO2/RingO2/O2 Max family) or "oxyii"
+            (O2Ring-S / T8520) -- selects which library scan function to use.
 
     Returns:
         The discovered device's BLE address.
@@ -54,21 +64,45 @@ async def discover_device(timeout: float = 60.0) -> str:
         "No device configured yet - scanning for a supported ring "
         "(make sure it's powered on and nearby)..."
     )
-    devices = await discover(timeout=timeout)
+    if protocol == "oxyii":
+        devices = await discover_oxyii(timeout=timeout)
+    else:
+        devices = await discover(timeout=timeout)
     if not devices:
         raise TimeoutError(f"No supported device found within {timeout}s")
     return devices[0].address
 
 
-def _reading_to_row(reading: Reading | RtReading, address: str) -> dict[str, object]:
-    """Flatten an RtReading (or legacy Reading) into storage-ready fields.
+def _reading_to_row(
+    reading: Reading | RtReading | OxyIIReading, address: str
+) -> dict[str, object]:
+    """Flatten a reading from either protocol into storage-ready fields.
 
-    RtReading (the default, CMD_RT_DATA) and the legacy Reading
-    (CMD_READ_SENSORS) share every field this daemon stores except naming:
-    RtReading.pulse_bpm/battery_state vs. Reading.heart_rate/charging.
-    Reading also reports a `movement` value RtReading doesn't have; it isn't
-    persisted, since there's no equivalent column to keep it consistent with.
+    RtReading (the legacy protocol's default, CMD_RT_DATA) and the legacy
+    protocol's older Reading (CMD_READ_SENSORS) share every field this
+    daemon stores except naming: RtReading.pulse_bpm/battery_state vs.
+    Reading.heart_rate/charging. Reading also reports a `movement` value
+    RtReading doesn't have; it isn't persisted, since there's no
+    equivalent column to keep it consistent with.
+
+    OxyIIReading (the O2Ring-S / T8520's completely different protocol)
+    has no battery_state or perfusion_index equivalent -- both columns
+    already tolerate NULL for exactly this reason, so no schema change
+    was needed to support a second protocol.
     """
+    if isinstance(reading, OxyIIReading):
+        return {
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "address": address,
+            "spo2": reading.spo2,
+            "pulse_bpm": reading.heart_rate,
+            "battery": reading.battery,
+            "battery_state": None,
+            "perfusion_index": None,
+            "worn": reading.worn,
+            "calibrating": reading.calibrating,
+        }
+
     is_legacy = isinstance(reading, Reading)
     return {
         "recorded_at": datetime.now(timezone.utc).isoformat(),
@@ -162,7 +196,9 @@ async def _sync_files_once(config: DaemonConfig, address: str) -> None:
     from .sync_files import sync_files
 
     try:
-        downloaded = await sync_files(config.db_path, address, config.adapter or None)
+        downloaded = await sync_files(
+            config.db_path, address, config.adapter or None, config.protocol
+        )
         if downloaded:
             _LOGGER.info("Synced %d new session file(s) from %s", downloaded, address)
     except Exception:
@@ -200,7 +236,7 @@ async def run_daemon(
     address = config.address
     if not address:
         discovery_timeout = float(once_timeout) if once else 60.0
-        address = await discover_device(discovery_timeout)
+        address = await discover_device(discovery_timeout, config.protocol)
         persist_discovered_address(config.config_path, address)
         _LOGGER.info("Discovered device at %s - saved to %s", address, config.config_path)
 
@@ -211,7 +247,7 @@ async def run_daemon(
     async with _mqtt_connection(mqtt_config) as mqtt_client:
         background_tasks: list[asyncio.Task] = []
 
-        def on_reading(reading: Reading | RtReading) -> None:
+        def on_reading(reading: Reading | RtReading | OxyIIReading) -> None:
             nonlocal reading_received
             row = _reading_to_row(reading, address)
             store.record_reading(**row)
@@ -232,15 +268,25 @@ async def run_daemon(
             if once:
                 stop_event.set()
 
-        client = O2RingClient(
-            address,
-            on_reading=on_reading,
-            legacy_sensors=config.legacy_sensors,
-            adapter=config.adapter or None,
-            logger=_LOGGER,
-            cooldown_seconds=config.cooldown_seconds,
-            read_period=config.read_period,
-        )
+        if config.protocol == "oxyii":
+            client = OxyIIClient(
+                address,
+                on_reading=on_reading,
+                adapter=config.adapter or None,
+                logger=_LOGGER,
+                cooldown_seconds=config.cooldown_seconds,
+                read_period=config.read_period,
+            )
+        else:
+            client = O2RingClient(
+                address,
+                on_reading=on_reading,
+                legacy_sensors=config.legacy_sensors,
+                adapter=config.adapter or None,
+                logger=_LOGGER,
+                cooldown_seconds=config.cooldown_seconds,
+                read_period=config.read_period,
+            )
 
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
@@ -329,9 +375,9 @@ def _check_config(config_path: str) -> int:
 
     print(f"{config_path}: OK")
     print(
-        "  monitor: address="
-        f"{daemon_config.address or '(auto-discover)'} adapter="
-        f"{daemon_config.adapter or '(default)'} "
+        "  monitor: protocol="
+        f"{daemon_config.protocol} address={daemon_config.address or '(auto-discover)'} "
+        f"adapter={daemon_config.adapter or '(default)'} "
         f"legacy_sensors={'yes' if daemon_config.legacy_sensors else 'no'}"
     )
     print(f"  storage: db_path={daemon_config.db_path}")
