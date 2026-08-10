@@ -407,6 +407,11 @@ reading count, and the worst SpO2 category seen that period). For a long
 history, `rollup` paired with the chart is generally more useful than
 paging through a continuous stream of readings.
 
+Battery level isn't shown per-reading in the PDF table -- it's a device/
+alerting concern (see [Alerting](#alerting)'s `low_battery_percent`), not a
+clinically relevant data point to page through. CSV export still includes
+it as a column for anyone doing their own analysis.
+
 `report.exclude_not_worn` (default yes) skips readings where the device
 reported the ring as not worn -- an idle/off-finger reading isn't a
 clinically meaningful data point, and including it would skew averages and

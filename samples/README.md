@@ -30,7 +30,10 @@ chart, the SpO2/pulse trend charts, the summary line, and the downloaded-
 session summary table; only the specific toggle each demonstrates differs.
 `include_address` (on in every sample but `full-minimal.pdf`) prints an
 "Address:" line in the header rather than a table column -- see
-`full-world.pdf`'s header vs. its reading table.
+`full-world.pdf`'s header vs. its reading table. Battery level isn't in
+the reading table at all -- it's covered by `[alerting] low_battery_percent`
+instead (see the main README's Alerting section); CSV export still
+includes it as a column.
 
 The fixture's one downloaded session isn't exported anywhere in these
 samples -- see [Exporting a session's raw records](../README.md#exporting-a-sessions-raw-records)
