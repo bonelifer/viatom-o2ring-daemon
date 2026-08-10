@@ -79,8 +79,9 @@ class ProfileConfig:
     name: str
     email: str
     notes: str
-    date_format: str  # "" (unset, use report.date_format), "us", or "world"
-    page_size: str  # "" (unset, use report.page_size), "letter", or "a4"
+    region: str  # "" (unset), "us" (-> date_format=us, page_size=letter), or "world" (-> world, a4)
+    date_format: str  # "" (unset, use region or report.date_format), "us", or "world"
+    page_size: str  # "" (unset, use region or report.page_size), "letter", or "a4"
     apprise_urls: list[str]  # empty means "use [alerting] apprise_urls"
     stale_after_minutes: int | None  # None means "use [alerting] stale_after_minutes"
     low_spo2_percent: int | None  # None means "use [alerting] low_spo2_percent"
@@ -90,12 +91,23 @@ DEFAULT_PROFILE_CONFIG = ProfileConfig(
     name="",
     email="",
     notes="",
+    region="",
     date_format="",
     page_size="",
     apprise_urls=[],
     stale_after_minutes=None,
     low_spo2_percent=None,
 )
+
+_REGIONS = ("us", "world")
+
+# region -> (date_format, page_size) it implies, applied by
+# report._apply_profile_overrides before that profile's own explicit
+# date_format/page_size (which still take precedence if also set).
+REGION_REPORT_DEFAULTS = {
+    "us": ("us", "letter"),
+    "world": ("world", "a4"),
+}
 
 
 @dataclass
@@ -353,6 +365,10 @@ def load_profile_config(config_path: str) -> ProfileConfig:
 
     section = parser["profile"]
 
+    region = section.get("region", "").strip().lower()
+    if region and region not in _REGIONS:
+        raise ConfigError(f"profile.region must be one of {_REGIONS}, got {region!r}")
+
     date_format = section.get("date_format", "").strip().lower()
     if date_format and date_format not in _DATE_FORMATS:
         raise ConfigError(
@@ -390,6 +406,7 @@ def load_profile_config(config_path: str) -> ProfileConfig:
         name=section.get("name", "").strip(),
         email=section.get("email", "").strip(),
         notes=section.get("notes", "").strip(),
+        region=region,
         date_format=date_format,
         page_size=page_size,
         apprise_urls=apprise_urls,

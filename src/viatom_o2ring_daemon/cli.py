@@ -360,7 +360,10 @@ def _check_config(config_path: str) -> int:
         f"host={api_config.host} port={api_config.port} "
         f"token={'(set)' if api_config.token else '(none)'}"
     )
-    print(f"  profile: name={profile_config.name or '(unset)'}")
+    print(
+        f"  profile: name={profile_config.name or '(unset)'} "
+        f"region={profile_config.region or '(unset)'}"
+    )
     print(f"  file_sync: enabled={'yes' if file_sync_config.enabled else 'no'}")
     if is_insecurely_exposed(api_config):
         print(

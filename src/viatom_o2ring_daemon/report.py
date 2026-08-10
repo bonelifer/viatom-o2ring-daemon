@@ -24,6 +24,7 @@ from .categories import MILD, MODERATE, NORMAL, SEVERE, classify
 from .config import (
     DEFAULT_PROFILE_CONFIG,
     DEFAULT_REPORT_CONFIG,
+    REGION_REPORT_DEFAULTS,
     ConfigError,
     ProfileConfig,
     ReportConfig,
@@ -308,8 +309,20 @@ def fetch_session_records(
 def _apply_profile_overrides(
     report_config: ReportConfig, profile_config: ProfileConfig
 ) -> ReportConfig:
-    """Apply a profile's date_format/page_size overrides onto report_config."""
+    """Apply a profile's region/date_format/page_size overrides onto report_config.
+
+    ``region`` (if set) supplies both date_format and page_size at once --
+    the common case of "this wearer's reports should always look right for
+    where they are," regardless of what the shared [report] default is set
+    to. An explicit date_format/page_size on the same profile still wins
+    over its region, for the rarer case of wanting one but not the other
+    (e.g. US date format on A4 paper).
+    """
     overrides = {}
+    if profile_config.region:
+        region_date_format, region_page_size = REGION_REPORT_DEFAULTS[profile_config.region]
+        overrides["date_format"] = region_date_format
+        overrides["page_size"] = region_page_size
     if profile_config.date_format:
         overrides["date_format"] = profile_config.date_format
     if profile_config.page_size:

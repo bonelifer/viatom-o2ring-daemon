@@ -97,6 +97,7 @@ def test_load_profile_config_missing_section(tmp_path):
     config_path = _write(tmp_path, _BASE_CONFIG)
     profile = load_profile_config(config_path)
     assert profile.name == ""
+    assert profile.region == ""
     assert profile.stale_after_minutes is None
 
 
@@ -112,6 +113,18 @@ def test_load_profile_config(tmp_path):
     assert profile.email == "jane@example.com"
     assert profile.low_spo2_percent == 90
     assert profile.apprise_urls == ["json://localhost"]
+
+
+def test_load_profile_config_region(tmp_path):
+    config_path = _write(tmp_path, _BASE_CONFIG + "\n[profile]\nregion = us\n")
+    profile = load_profile_config(config_path)
+    assert profile.region == "us"
+
+
+def test_load_profile_config_invalid_region(tmp_path):
+    config_path = _write(tmp_path, _BASE_CONFIG + "\n[profile]\nregion = mars\n")
+    with pytest.raises(ConfigError):
+        load_profile_config(config_path)
 
 
 def test_load_profile_config_percent_in_notes_does_not_crash(tmp_path):
