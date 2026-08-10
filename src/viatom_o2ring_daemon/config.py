@@ -11,6 +11,17 @@ class ConfigError(Exception):
     """Raised when the configuration file is missing or invalid."""
 
 
+#: "legacy" (default): the original O2Ring/KidsO2/RingO2/O2 Max family,
+#: via viatom_o2ring_ble.O2RingClient. "oxyii": the O2Ring-S (T8520),
+#: which speaks a completely different protocol via OxyIIClient -- see
+#: this package's CLAUDE.md. A daemon instance already targets exactly
+#: one device (DaemonConfig.address), so this is a single fixed choice
+#: per config file, not auto-detected: a household with both device
+#: families runs one daemon instance per device, same as it would for two
+#: rings of the same family.
+_PROTOCOLS = ("legacy", "oxyii")
+
+
 @dataclass
 class DaemonConfig:
     """Parsed daemon configuration."""
@@ -21,6 +32,7 @@ class DaemonConfig:
     cooldown_seconds: int
     read_period: float
     legacy_sensors: bool
+    protocol: str  # "legacy" or "oxyii" -- see _PROTOCOLS
     db_path: str
     log_level: str
 
@@ -248,6 +260,10 @@ def load_config(config_path: str) -> DaemonConfig:
     if not db_path:
         raise ConfigError("storage.db_path must be set")
 
+    protocol = monitor.get("protocol", "legacy").strip().lower()
+    if protocol not in _PROTOCOLS:
+        raise ConfigError(f"monitor.protocol must be one of {_PROTOCOLS}, got {protocol!r}")
+
     return DaemonConfig(
         config_path=path,
         address=monitor.get("address", "").strip(),
@@ -257,6 +273,7 @@ def load_config(config_path: str) -> DaemonConfig:
         legacy_sensors=_parse_bool(
             monitor.get("legacy_sensors", "no"), "monitor.legacy_sensors"
         ),
+        protocol=protocol,
         db_path=db_path,
         log_level=daemon.get("log_level", "INFO").strip().upper(),
     )

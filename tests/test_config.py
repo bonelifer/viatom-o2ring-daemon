@@ -42,6 +42,7 @@ def test_load_config_basic(tmp_path):
     assert config.cooldown_seconds == 5
     assert config.read_period == 2.0
     assert config.legacy_sensors is False
+    assert config.protocol == "legacy"
     assert config.db_path == "/tmp/readings.db"
     assert config.log_level == "INFO"
 
@@ -64,6 +65,24 @@ def test_load_config_legacy_sensors(tmp_path):
     config_path = _write(tmp_path, contents)
     config = load_config(config_path)
     assert config.legacy_sensors is True
+
+
+def test_load_config_protocol_oxyii(tmp_path):
+    contents = _BASE_CONFIG.replace(
+        "cooldown_seconds = 5", "cooldown_seconds = 5\nprotocol = oxyii"
+    )
+    config_path = _write(tmp_path, contents)
+    config = load_config(config_path)
+    assert config.protocol == "oxyii"
+
+
+def test_load_config_rejects_invalid_protocol(tmp_path):
+    contents = _BASE_CONFIG.replace(
+        "cooldown_seconds = 5", "cooldown_seconds = 5\nprotocol = bogus"
+    )
+    config_path = _write(tmp_path, contents)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
 
 
 def test_load_report_config_defaults(tmp_path):

@@ -18,16 +18,65 @@ medical advice; the SpO2 category labels and alerting are informational
 only. Talk to a doctor about your oxygen saturation readings.**
 
 **Work in progress -- not yet verified against real hardware.** This daemon
-is built on `viatom-o2ring-ble`, which is itself protocol-correct-on-paper
-only as of this writing (cross-checked against five independent sources but
-not yet tested against an actual O2Ring-family device). See that library's
-`CLAUDE.md` and README for details.
+is built on `viatom-o2ring-ble`. Its legacy-protocol support (the default,
+`monitor.protocol = legacy`) is protocol-correct-on-paper only as of this
+writing (cross-checked against five independent sources but not yet
+tested against an actual O2Ring-family device). Its O2Ring-S support
+(`monitor.protocol = oxyii`) is ported from a source that *has* verified
+its own implementation against real hardware -- a meaningfully stronger
+starting point -- but the port itself, as wired into this daemon, hasn't
+been independently re-verified here either. See `viatom-o2ring-ble`'s
+`CLAUDE.md` and README for details on both.
 
 ## Supported devices
 
-Whatever `viatom-o2ring-ble` supports: O2Ring, KidsO2, RingO2, and O2 Max.
-**The O2Ring S uses a different, incompatible protocol and is not
-supported.**
+Two device families, selected via `monitor.protocol` in the config file
+(see [Device protocol](#device-protocol)):
+
+- `protocol = legacy` (the default): O2Ring, KidsO2, RingO2, and O2 Max --
+  whatever `viatom-o2ring-ble`'s `O2RingClient` supports.
+- `protocol = oxyii`: the O2Ring-S (T8520), which speaks a completely
+  different BLE protocol -- via `viatom-o2ring-ble`'s `OxyIIClient`.
+
+## Device protocol
+
+```ini
+[monitor]
+protocol = legacy   # or oxyii
+```
+
+Everything downstream of live-reading capture -- storage, reports,
+alerting, the HTTP API, pruning -- is protocol-agnostic; it only ever
+operates on the rows already recorded in SQLite, not on which BLE
+protocol produced them. Only two things actually branch on
+`monitor.protocol`:
+
+- **Live streaming** (`viatom-o2ring-daemon`): `RtReading`/`Reading`
+  (legacy) or `OxyIIReading` (oxyii) are both flattened into the same
+  `live_readings` row shape. OxyII readings have no perfusion-index or
+  charge-state equivalent -- those columns are just left `NULL`, the same
+  way they already tolerate a legacy reading missing one or the other.
+- **Stored-session sync** (`viatom-o2ring-sync-files`): legacy `.vld`
+  files and OxyII "Format A" recordings decode into different shapes
+  (Format A has no embedded timestamp or duration -- only the
+  recording's filename and record count) and get adapted into the same
+  `sessions`/`session_records` tables either way. An OxyII recording
+  that hasn't finished flushing its trailer yet is skipped and retried
+  on the next sync, rather than stored with an incomplete summary --
+  see `viatom-o2ring-ble`'s CLAUDE.md for why size alone can't tell the
+  two states apart.
+
+`monitor.legacy_sensors` (the older `CMD_READ_SENSORS` fallback) only
+applies when `protocol = legacy`; it's ignored for `oxyii`, which has no
+equivalent legacy command.
+
+`--check-config` prints the resolved protocol so it's obvious which
+device family a given config file targets.
+
+A daemon instance already targets exactly one device (`monitor.address`),
+so this is a single fixed choice per config file, not auto-detected. A
+household with both device families runs one daemon instance per device,
+same as it would for two rings of the same family.
 
 ## Features
 
@@ -50,6 +99,8 @@ supported.**
   personalization, alert overrides) -- a ring has exactly one wearer at a
   time, so unlike a shared blood-pressure cuff or scale, there's no
   multi-person "who was this?" tagging to solve
+- Supports two device families/protocols (`monitor.protocol = legacy` or
+  `oxyii`) -- see [Device protocol](#device-protocol)
 
 ## Installation
 
@@ -474,8 +525,14 @@ SQLite.
 - **`No Bluetooth scanner available`**: check `bluetoothctl` shows an
   adapter, and that the `viatom-o2ring-daemon` system user is in the
   `bluetooth` group (the systemd unit sets `SupplementaryGroups=bluetooth`).
-- **RT_DATA readings look wrong**: try `monitor.legacy_sensors = yes` to
-  fall back to the older `CMD_READ_SENSORS` command.
+- **RT_DATA readings look wrong** (`protocol = legacy` only): try
+  `monitor.legacy_sensors = yes` to fall back to the older
+  `CMD_READ_SENSORS` command.
+- **O2Ring-S file sync never finds anything, or a session never appears**
+  (`protocol = oxyii` only): a recording that hasn't finalized yet (its
+  trailer hasn't flushed) is deliberately skipped rather than stored
+  incomplete -- it'll show up on a later sync once the ring finishes
+  writing it. See [Device protocol](#device-protocol).
 - **Config errors**: run `--check-config` for a section-by-section report of
   what's wrong.
 
@@ -484,7 +541,10 @@ SQLite.
 - Built on
   [`viatom-o2ring-ble`](https://github.com/bonelifer/viatom-o2ring-ble),
   which cross-checks five independent community/official sources for its
-  protocol decoding -- see that repo's README and `CLAUDE.md`.
+  legacy-protocol decoding, and separately ports its O2Ring-S (OxyII)
+  support from
+  [nglessner/o2ring-s-protocol](https://github.com/nglessner/o2ring-s-protocol)
+  -- see that repo's README and `CLAUDE.md`.
 - Project layout modeled on
   [`etekcity-scale-daemon`](https://github.com/bonelifer/etekcity-scale-daemon)
   and [`etekcity-bp-daemon`](https://github.com/bonelifer/etekcity-bp-daemon).

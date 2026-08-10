@@ -1,4 +1,13 @@
 [monitor]
+# Which device family this ring speaks: legacy (O2Ring, KidsO2, RingO2,
+# O2 Max, and other plain "Oxy"-protocol devices) or oxyii (the O2Ring-S /
+# T8520, a completely different protocol -- see viatom-o2ring-ble's
+# CLAUDE.md). A daemon instance already targets exactly one device, so
+# this is a single fixed choice per config file, not auto-detected. A
+# household with both device families runs one daemon instance per
+# device, same as it would for two rings of the same family.
+protocol = legacy
+
 # Leave address empty to auto-discover the device on first run (power on
 # the ring and keep it nearby while the daemon is scanning). Once
 # discovered, this file is updated automatically so future restarts
@@ -19,7 +28,8 @@ read_period = 2.0
 # Use the legacy CMD_READ_SENSORS (0x17) command instead of the default
 # CMD_RT_DATA (0x1B), the command the current official Viatom/Wellue app
 # actually polls. Only set this if RT_DATA doesn't work against your
-# device's firmware.
+# device's firmware. Ignored when protocol = oxyii (the O2Ring-S has no
+# equivalent legacy command).
 legacy_sensors = no
 
 [storage]

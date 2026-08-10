@@ -12,6 +12,22 @@
   one too, eventually. That library is also still unverified against real
   hardware as of this writing, which this daemon inherits.
 
+  As of this writing, that library also implements a second, completely
+  separate protocol -- OxyII, for the O2Ring-S (T8520) -- via a parallel
+  `OxyIIClient`/`discover_oxyii()`/`OxyIIReading`/`OxyIIFileHeader`/
+  `OxyIIFileRecord` (ported from nglessner/o2ring-s-protocol; see that
+  library's `CLAUDE.md`). This daemon wires it up behind
+  `monitor.protocol = oxyii` (default `legacy`) -- see cli.py's
+  `_reading_to_row` (branches on `isinstance(reading, OxyIIReading)`) and
+  sync_files.py's `_sync_oxyii_files`/`_adapt_oxyii_session` (adapts
+  OxyIIFileHeader/OxyIIFileRecord, which have no embedded timestamp/
+  duration/mode, into the same shape storage.record_session() already
+  expects from the legacy protocol's VldHeader/VldRecord). storage.py's
+  schema itself needed no changes -- `battery_state`/`perfusion_index`
+  (which OxyII readings don't have) were already nullable, and
+  `mode`/`percent_below_90pct`/`steps` (which OxyIIFileHeader doesn't
+  have) already tolerated NULL from legacy sessions missing a field too.
+
 - **etekcity-bp-daemon** -- https://github.com/bonelifer/etekcity-bp-daemon
   -- the closest architectural sibling: also a continuous-BLE-monitoring
   device daemon (as opposed to trividia-truemetrix-daemon's docked/batch
@@ -62,3 +78,11 @@ tests), and the Docker image is CI-verified end to end (real `docker build`
 `.github/workflows/ci.yml`), but nothing in CI can exercise the actual BLE
 path -- connecting to a real O2Ring-family device, streaming live readings,
 or downloading a real `.vld` file -- which hasn't been tested yet.
+
+`protocol = oxyii` (O2Ring-S) support is a partial exception, same
+caveat-shape as `viatom-o2ring-ble`'s own: the underlying `OxyIIClient` is
+ported from a source that verified its protocol implementation against a
+real T8520, a meaningfully stronger starting point -- but the daemon-side
+wiring (`_reading_to_row`'s OxyII branch, `_sync_oxyii_files`/
+`_adapt_oxyii_session`) is covered by unit tests against fake clients only,
+not a real device.
