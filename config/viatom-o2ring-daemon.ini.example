@@ -1,0 +1,194 @@
+[monitor]
+# Leave address empty to auto-discover the device on first run (power on
+# the ring and keep it nearby while the daemon is scanning). Once
+# discovered, this file is updated automatically so future restarts
+# reconnect directly instead of scanning again.
+address =
+
+# Optional BLE adapter to use, e.g. hci0 (Linux only). Leave empty for the
+# system default adapter.
+adapter =
+
+# Seconds to ignore advertisements after a disconnection, so a device still
+# finishing its own disconnect handshake doesn't trigger a reconnect storm.
+cooldown_seconds = 5
+
+# Seconds between polls while streaming live readings.
+read_period = 2.0
+
+# Use the legacy CMD_READ_SENSORS (0x17) command instead of the default
+# CMD_RT_DATA (0x1B), the command the current official Viatom/Wellue app
+# actually polls. Only set this if RT_DATA doesn't work against your
+# device's firmware.
+legacy_sensors = no
+
+[storage]
+# Path to the SQLite database file where readings and sessions are recorded.
+db_path = /var/lib/viatom-o2ring-daemon/readings.db
+
+[daemon]
+# Logging level: DEBUG, INFO, WARNING, ERROR
+log_level = INFO
+
+[file_sync]
+# After each streaming session ends (daemon stop, or --once), connect once
+# more and download any stored .vld session files (e.g. overnight sleep
+# recordings) not already in the local database. Can also be run on its
+# own schedule via viatom-o2ring-sync-files -- see
+# viatom-o2ring-sync-files.timer. Defaults to yes.
+enabled = yes
+
+[report]
+# Include the device's BLE address as a column/field.
+include_address = yes
+
+# Print an avg/min/max summary and SpO2 category breakdown below the title.
+include_summary = yes
+
+# Shade each table row by SpO2 category (normal/mild/moderate/severe
+# hypoxemia) and include a Category column.
+include_categories = yes
+
+# List downloaded overnight/session recordings (see [file_sync]) in a
+# separate summary table.
+include_sessions = yes
+
+# Date/time format: us (MM/DD/YYYY, 12-hour) or world (DD/MM/YYYY, 24-hour)
+date_format = world
+
+# PDF page size: letter or a4
+page_size = letter
+
+# Include the SpO2-category pie chart and the SpO2/pulse trend line charts.
+# PDF only.
+include_chart = yes
+
+# Include a reading table at all (see table_layout below for which shape).
+# PDF only; CSV export always includes the full row set regardless of
+# either of these two settings.
+include_table = yes
+
+# Shape of the table, when include_table = yes:
+#   full    - one row per reading (default). Sprawls across many pages for
+#             a long history of continuous streaming.
+#   compact - Date/SpO2/Pulse/Battery only, packed into 2 side-by-side
+#             column groups so a page isn't mostly empty. Still one row per
+#             reading, just denser.
+#   rollup  - one row per week/month instead of per reading (avg/min SpO2,
+#             average pulse, reading count, and the worst SpO2 category
+#             seen that period).
+table_layout = full
+
+# Rollup bucket size, only used when table_layout = rollup: week (ISO
+# calendar week, Monday-Sunday) or month (calendar month).
+rollup_period = week
+
+# Skip readings where the device reported the ring as not worn. An idle/
+# off-finger reading isn't a clinically meaningful data point, and
+# including it would skew averages and the SpO2 category distribution.
+exclude_not_worn = yes
+
+[mqtt]
+# Publish each live reading to an MQTT broker as JSON. Defaults to no. A
+# broker outage is logged and non-fatal -- it never blocks local recording.
+enabled = no
+
+# Required if enabled = yes.
+host =
+port = 1883
+
+# Optional broker credentials; leave blank if not required.
+username =
+password =
+
+# yes or no -- wraps the connection in TLS
+use_tls = no
+
+# Messages publish to <topic_prefix>/<device address>/state
+topic_prefix = viatom_o2ring_daemon
+
+# MQTT delivery guarantee for each publish: 0 (at most once -- fire and
+# forget, no ack/retry), 1 (at least once -- retries until acked, may
+# duplicate), or 2 (exactly once -- slowest, most overhead). Defaults to 0
+# since a dropped publish isn't a real loss -- the reading is already
+# durably recorded in the local database regardless of MQTT.
+qos = 0
+
+# yes or no -- whether the broker retains the last message for new subscribers
+retain = yes
+
+[alerting]
+# Notify via Apprise (https://github.com/caronc/apprise) on staleness, a
+# low-SpO2 reading, or low battery. Checked by viatom-o2ring-alert-check,
+# run periodically (see viatom-o2ring-alert-check.timer) -- nothing here
+# runs automatically on its own. Defaults to no.
+enabled = no
+
+# Comma-separated Apprise service URLs, e.g. tgram://bot_token/chat_id.
+# Required if enabled = yes.
+apprise_urls =
+
+# Alert if no reading has arrived in this many minutes. 0 disables this check.
+stale_after_minutes = 0
+
+# Alert if the latest worn reading's SpO2 is at or below this percent.
+# 0 disables this check. 88 is a commonly used clinical threshold for
+# supplemental-oxygen consideration; adjust to what your care team advises.
+low_spo2_percent = 0
+
+# Alert if the latest reading's battery level is at or below this percent.
+# 0 disables this check.
+low_battery_percent = 0
+
+# Where to persist per-address alert state (throttling repeat alerts).
+state_path = /var/lib/viatom-o2ring-daemon/alert-state.json
+
+[api]
+# Lightweight local HTTP API (viatom-o2ring-api): GET /health, /latest,
+# /sessions, and /report. Defaults to no. There's no TLS built in -- keep
+# host bound to loopback (the default) unless it sits behind a reverse proxy.
+enabled = no
+
+# Bind address. Change to 0.0.0.0 (or a specific interface) only if you
+# understand the exposure -- set token below if you do.
+host = 127.0.0.1
+port = 8080
+
+# Optional bearer token: if set, all endpoints except /health require an
+# "Authorization: Bearer <token>" header. Leave blank for no auth (fine
+# for loopback-only use).
+token =
+
+[profile]
+# The ring's wearer. Unlike a shared blood-pressure cuff or scale, a ring
+# has exactly one wearer at a time and this daemon instance already targets
+# exactly one device (monitor.address above) -- so there's just one
+# [profile] section, not a list of names to tag each reading with. A
+# household with more than one ring/wearer runs one daemon instance per
+# ring (separate config file and db_path).
+#
+# All fields are optional and only personalize reports/alerts if provided.
+#
+# name/email print below the title in PDF reports (e.g. for handing a
+# report to a doctor -- leave either blank to omit that line). notes is a
+# free-text line for clinical context (e.g. "prescribed nighttime O2").
+#
+# date_format (us or world) / page_size (letter or a4) each independently
+# override the matching [report] setting -- leave blank to just use the
+# shared default.
+#
+# apprise_urls (comma-separated) replaces -- not adds to -- the global
+# [alerting] apprise_urls for this wearer's alerts. Leave blank to just
+# use the global list.
+#
+# stale_after_minutes / low_spo2_percent override the matching [alerting]
+# value (0 explicitly disables the check, blank means "inherit the global
+# value"). low_battery_percent is never overridden per profile -- it's a
+# device fact, not a personal preference.
+#
+# name = Jane Smith
+# email = jane@example.com
+# notes = Prescribed nighttime supplemental O2, target SpO2 >= 92%
+# apprise_urls = tgram://bot_token/jane_chat_id
+# stale_after_minutes = 30
+# low_spo2_percent = 90

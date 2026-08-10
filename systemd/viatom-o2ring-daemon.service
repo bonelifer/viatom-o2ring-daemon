@@ -1,0 +1,18 @@
+[Unit]
+Description=Viatom/Wellue O2Ring pulse oximeter BLE logging daemon
+After=bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=viatom-o2ring-daemon
+Group=viatom-o2ring-daemon
+SupplementaryGroups=bluetooth
+ExecStart=/usr/bin/viatom-o2ring-daemon --config /etc/viatom-o2ring-daemon/config.ini
+Restart=on-failure
+RestartSec=5
+StateDirectory=viatom-o2ring-daemon
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

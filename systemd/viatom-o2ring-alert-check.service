@@ -1,0 +1,8 @@
+[Unit]
+Description=Check O2Ring readings for stale/low-SpO2/low-battery conditions
+
+[Service]
+Type=oneshot
+User=viatom-o2ring-daemon
+Group=viatom-o2ring-daemon
+ExecStart=/usr/bin/viatom-o2ring-alert-check --config /etc/viatom-o2ring-daemon/config.ini

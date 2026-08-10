@@ -1,0 +1,8 @@
+[Unit]
+Description=Generate a scheduled O2Ring pulse oximeter report
+
+[Service]
+Type=oneshot
+User=viatom-o2ring-daemon
+Group=viatom-o2ring-daemon
+ExecStart=/usr/bin/viatom-o2ring-generate-report

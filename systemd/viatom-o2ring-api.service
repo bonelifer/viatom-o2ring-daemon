@@ -1,0 +1,14 @@
+[Unit]
+Description=O2Ring HTTP API (latest reading / sessions / on-demand report)
+After=viatom-o2ring-daemon.service
+
+[Service]
+Type=simple
+User=viatom-o2ring-daemon
+Group=viatom-o2ring-daemon
+ExecStart=/usr/bin/viatom-o2ring-api --config /etc/viatom-o2ring-daemon/config.ini
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

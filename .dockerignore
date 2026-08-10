@@ -1,0 +1,16 @@
+.git
+.github
+__pycache__
+*.py[cod]
+*.egg-info
+.venv
+venv
+build
+dist
+tests
+.pytest_cache
+samples
+config/viatom-o2ring-daemon.ini
+*.db
+*.db-journal
+*.log

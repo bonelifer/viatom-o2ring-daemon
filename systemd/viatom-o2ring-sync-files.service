@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync stored O2Ring .vld session files
+After=bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=oneshot
+User=viatom-o2ring-daemon
+Group=viatom-o2ring-daemon
+SupplementaryGroups=bluetooth
+ExecStart=/usr/bin/viatom-o2ring-sync-files --config /etc/viatom-o2ring-daemon/config.ini
