@@ -26,5 +26,11 @@ None include a `sessions` table, since the fixture has no downloaded `.vld`
 files -- `report.include_sessions = yes` adds one automatically once
 sessions exist in the database.
 
+`full-world-with-notes.pdf` is the same `full`/`world` fixture rendered
+with a `[profile]` section set (`name`, `email`, `notes`), to show the
+Wearer/Email/Notes lines that print below the generated-timestamp line
+when those fields are configured -- normally handy for handing a printed
+report to a doctor.
+
 Regenerate with `viatom-o2ring-report` against your own database, or see
 `scripts/make-fixture-db.py` for a minimal fixture to build one.
