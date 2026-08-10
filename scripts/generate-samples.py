@@ -130,10 +130,27 @@ _GRID_SAMPLES: list[tuple[str, dict[str, str]]] = [
     ("table-only.pdf", {"include_chart": "no", "include_sessions": "no"}),
 ]
 
-# Profile personalization (name/email/notes header block) only makes sense
-# as its own demo, since every other sample intentionally uses the blank
-# default profile.
-_PROFILE_SAMPLE = ("full-world-with-notes.pdf", {"table_layout": "full", "date_format": "world"})
+_BASE_PROFILE = {
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "notes": "Prescribed nighttime supplemental O2, target SpO2 >= 92%",
+}
+
+# Profile personalization only makes sense as its own demo, since every
+# other sample intentionally uses the blank default profile.
+# (output filename, [report] overrides, [profile] overrides on top of _BASE_PROFILE)
+_PROFILE_SAMPLES: list[tuple[str, dict[str, str], dict[str, str]]] = [
+    ("full-world-with-notes.pdf", {"table_layout": "full", "date_format": "world"}, {}),
+    # The shared [report] default here is world/a4 (as if that were the
+    # household default), but this wearer's own region = us overrides it --
+    # showing region winning over the shared default, not just the absence
+    # of one.
+    (
+        "full-region-us.pdf",
+        {"table_layout": "full", "date_format": "world", "page_size": "a4"},
+        {"region": "us"},
+    ),
+]
 
 
 def _build_fixture_db(db_path: Path) -> None:
@@ -159,19 +176,18 @@ def _build_fixture_db(db_path: Path) -> None:
 
 
 def _write_config(
-    path: Path, db_path: Path, report_overrides: dict[str, str], with_profile: bool
+    path: Path,
+    db_path: Path,
+    report_overrides: dict[str, str],
+    profile_overrides: dict[str, str] | None,
 ) -> None:
     parser = configparser.ConfigParser(interpolation=None)
     parser["monitor"] = {"address": _ADDRESS}
     parser["storage"] = {"db_path": str(db_path)}
     parser["daemon"] = {"log_level": "INFO"}
     parser["report"] = {**_BASE_REPORT, **report_overrides}
-    if with_profile:
-        parser["profile"] = {
-            "name": "Jane Smith",
-            "email": "jane@example.com",
-            "notes": "Prescribed nighttime supplemental O2, target SpO2 >= 92%",
-        }
+    if profile_overrides is not None:
+        parser["profile"] = {**_BASE_PROFILE, **profile_overrides}
     with open(path, "w") as config_file:
         parser.write(config_file)
 
@@ -182,20 +198,19 @@ def main() -> int:
     single_dir = samples_dir / "single"
     single_dir.mkdir(parents=True, exist_ok=True)
 
-    jobs: list[tuple[str, dict[str, str], bool]] = [
-        (filename, report_overrides, False) for filename, report_overrides in _GRID_SAMPLES
+    jobs: list[tuple[str, dict[str, str], dict[str, str] | None]] = [
+        (filename, report_overrides, None) for filename, report_overrides in _GRID_SAMPLES
     ]
-    filename, report_overrides = _PROFILE_SAMPLE
-    jobs.append((filename, report_overrides, True))
+    jobs.extend(_PROFILE_SAMPLES)
 
     with tempfile.TemporaryDirectory() as workdir:
         workdir_path = Path(workdir)
         db_path = workdir_path / "readings.db"
         _build_fixture_db(db_path)
 
-        for i, (filename, report_overrides, with_profile) in enumerate(jobs):
+        for i, (filename, report_overrides, profile_overrides) in enumerate(jobs):
             config_path = workdir_path / f"{i}-{filename}.ini"
-            _write_config(config_path, db_path, report_overrides, with_profile)
+            _write_config(config_path, db_path, report_overrides, profile_overrides)
             output_path = single_dir / filename
             argv = ["--config", str(config_path), "--output", str(output_path)]
             print(f"==> {output_path.relative_to(samples_dir)}")

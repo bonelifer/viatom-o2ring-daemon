@@ -270,6 +270,7 @@ and `db_path`).
 name = Jane Smith
 email = jane@example.com
 notes = Prescribed nighttime supplemental O2, target SpO2 >= 92%
+region = us
 apprise_urls = tgram://bot_token/jane_chat_id
 stale_after_minutes = 30
 low_spo2_percent = 90
@@ -277,8 +278,15 @@ low_spo2_percent = 90
 
 - `name`/`email`/`notes` print below the report title, handy when handing a
   printed report to a doctor (`notes` for clinical context).
-- `date_format`/`page_size` each independently override the matching
-  `[report]` setting.
+- `region` (`us` or `world`) sets both `date_format` and `page_size` at
+  once, to the pairing normally used together (`us` -> US date format on
+  letter paper; `world` -> world date format on A4), so this wearer's
+  reports always come out right for where they are regardless of the
+  shared `[report]` default -- e.g. a household default of `world`/A4, but
+  `region = us` for the one family member visiting a US doctor.
+- `date_format`/`page_size` each independently override `region` (if also
+  set) or the matching `[report]` setting -- only needed for the rarer
+  case of wanting one but not the other (e.g. US date format on A4 paper).
 - `apprise_urls` **replaces** the global `[alerting] apprise_urls` for this
   wearer's alerts rather than adding to it. Leave blank to just use the
   global list.

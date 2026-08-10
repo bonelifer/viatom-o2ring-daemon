@@ -23,6 +23,7 @@ stale relative to what the code actually produces.
 | `chart-only.pdf` | `include_table`/`include_sessions = no` |
 | `table-only.pdf` | `include_chart`/`include_sessions = no` |
 | `full-world-with-notes.pdf` | a `[profile]` section set (`name`, `email`, `notes`), showing the Wearer/Email/Notes lines below the generated-timestamp line -- handy for handing a printed report to a doctor |
+| `full-region-us.pdf` | `[profile] region = us` winning over a shared `[report]` default of `date_format = world, page_size = a4` -- the table renders `MM/DD/YYYY` on Letter-size pages despite the household default being world/A4 |
 
 Every sample except the toggle demos above includes the SpO2-category pie
 chart, the SpO2/pulse trend charts, the summary line, and the downloaded-

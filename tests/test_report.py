@@ -1,8 +1,10 @@
 import csv
 import datetime
+from dataclasses import replace
 
-from viatom_o2ring_daemon.config import DEFAULT_REPORT_CONFIG
+from viatom_o2ring_daemon.config import DEFAULT_PROFILE_CONFIG, DEFAULT_REPORT_CONFIG
 from viatom_o2ring_daemon.report import (
+    _apply_profile_overrides,
     build_csv,
     build_pdf,
     build_session_records_csv,
@@ -203,3 +205,32 @@ def test_cli_export_session_unknown_filename(tmp_path):
     db_path = _seed(tmp_path)
     exit_code = main(["--db", db_path, "--export-session", "nonexistent.vld"])
     assert exit_code == 1
+
+
+def test_apply_profile_overrides_no_profile():
+    result = _apply_profile_overrides(DEFAULT_REPORT_CONFIG, DEFAULT_PROFILE_CONFIG)
+    assert result == DEFAULT_REPORT_CONFIG
+
+
+def test_apply_profile_overrides_region_us():
+    base = replace(DEFAULT_REPORT_CONFIG, date_format="world", page_size="a4")
+    profile = replace(DEFAULT_PROFILE_CONFIG, region="us")
+    result = _apply_profile_overrides(base, profile)
+    assert result.date_format == "us"
+    assert result.page_size == "letter"
+
+
+def test_apply_profile_overrides_region_world():
+    base = replace(DEFAULT_REPORT_CONFIG, date_format="us", page_size="letter")
+    profile = replace(DEFAULT_PROFILE_CONFIG, region="world")
+    result = _apply_profile_overrides(base, profile)
+    assert result.date_format == "world"
+    assert result.page_size == "a4"
+
+
+def test_apply_profile_overrides_explicit_field_wins_over_region():
+    base = DEFAULT_REPORT_CONFIG
+    profile = replace(DEFAULT_PROFILE_CONFIG, region="us", page_size="a4")
+    result = _apply_profile_overrides(base, profile)
+    assert result.date_format == "us"  # from region
+    assert result.page_size == "a4"  # explicit override wins over region's "letter"

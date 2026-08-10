@@ -173,9 +173,18 @@ token =
 # report to a doctor -- leave either blank to omit that line). notes is a
 # free-text line for clinical context (e.g. "prescribed nighttime O2").
 #
+# region (us or world) sets both date_format and page_size at once, to the
+# pairing normally used together: us -> date_format=us, page_size=letter;
+# world -> date_format=world, page_size=a4. Handy so this wearer's reports
+# always come out right for where they are, regardless of what the shared
+# [report] default is set to -- e.g. a household default of world/a4 for
+# most reports, but region = us for the one family member visiting a US
+# doctor. Leave blank to just use the shared [report] default.
+#
 # date_format (us or world) / page_size (letter or a4) each independently
-# override the matching [report] setting -- leave blank to just use the
-# shared default.
+# override region (if also set) or the matching [report] setting -- leave
+# blank to just use region or the shared default. Only needed for the rarer
+# case of wanting one but not the other (e.g. US date format on A4 paper).
 #
 # apprise_urls (comma-separated) replaces -- not adds to -- the global
 # [alerting] apprise_urls for this wearer's alerts. Leave blank to just
@@ -189,6 +198,7 @@ token =
 # name = Jane Smith
 # email = jane@example.com
 # notes = Prescribed nighttime supplemental O2, target SpO2 >= 92%
+# region = us
 # apprise_urls = tgram://bot_token/jane_chat_id
 # stale_after_minutes = 30
 # low_spo2_percent = 90
