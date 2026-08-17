@@ -37,5 +37,6 @@ includes it as a column.
 
 The fixture's one downloaded session isn't exported anywhere in these
 samples -- see [Exporting a session's raw records](../README.md#exporting-a-sessions-raw-records)
-for `viatom-o2ring-report --export-session` and the `/session-records` API
-endpoint, which pull the same data these summary rows are rolled up from.
+for `viatom-o2ring-report --export-session` and the `/api/v1/session-records`
+API endpoint, which pull the same data these summary rows are rolled up
+from.

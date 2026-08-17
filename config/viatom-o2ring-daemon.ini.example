@@ -157,9 +157,10 @@ low_battery_percent = 0
 state_path = /var/lib/viatom-o2ring-daemon/alert-state.json
 
 [api]
-# Lightweight local HTTP API (viatom-o2ring-api): GET /health, /latest,
-# /sessions, and /report. Defaults to no. There's no TLS built in -- keep
-# host bound to loopback (the default) unless it sits behind a reverse proxy.
+# Lightweight local HTTP API (viatom-o2ring-api): GET /api/v1/health,
+# /api/v1/capabilities, /api/v1/latest, /api/v1/sessions, and
+# /api/v1/report. Defaults to no. There's no TLS built in -- keep host
+# bound to loopback (the default) unless it sits behind a reverse proxy.
 enabled = no
 
 # Bind address. Change to 0.0.0.0 (or a specific interface) only if you
@@ -167,9 +168,9 @@ enabled = no
 host = 127.0.0.1
 port = 8080
 
-# Optional bearer token: if set, all endpoints except /health require an
-# "Authorization: Bearer <token>" header. Leave blank for no auth (fine
-# for loopback-only use).
+# Optional bearer token: if set, all endpoints except /api/v1/health and
+# /api/v1/capabilities require an "Authorization: Bearer <token>" header.
+# Leave blank for no auth (fine for loopback-only use).
 token =
 
 [profile]

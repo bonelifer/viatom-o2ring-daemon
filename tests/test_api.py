@@ -7,6 +7,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from viatom_o2ring_daemon.api import build_app, is_insecurely_exposed
 from viatom_o2ring_daemon.config import (
     DEFAULT_API_CONFIG,
+    DEFAULT_MQTT_CONFIG,
     DEFAULT_PROFILE_CONFIG,
     DEFAULT_REPORT_CONFIG,
 )
@@ -73,8 +74,8 @@ def _make_db_with_session(tmp_path):
 
 
 def _build(db_path, api_config=DEFAULT_API_CONFIG, report_config=DEFAULT_REPORT_CONFIG,
-           profile_config=DEFAULT_PROFILE_CONFIG):
-    return build_app(db_path, api_config, report_config, profile_config)
+           profile_config=DEFAULT_PROFILE_CONFIG, mqtt_config=DEFAULT_MQTT_CONFIG):
+    return build_app(db_path, api_config, report_config, profile_config, mqtt_config)
 
 
 def test_is_insecurely_exposed():
@@ -88,10 +89,57 @@ def test_health(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/health")
+            resp = await client.get("/api/v1/health")
             assert resp.status == 200
             body = await resp.json()
             assert body["status"] == "ok"
+
+    _run(scenario())
+
+
+def test_capabilities(tmp_path):
+    app = _build(_make_db(tmp_path))
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/v1/capabilities")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["daemon"] == "viatom-o2ring"
+            assert body["api_version"] == "v1"
+            assert body["measurement_types"] == ["spo2", "pulse"]
+            assert body["measurement_modes"] == ["spot", "session"]
+            assert body["profile_model"] == "single"
+            assert "recorded_at" in body["timestamp_fields"]["live_readings"]
+            assert "start_time" in body["timestamp_fields"]["sessions"]
+            assert "downloaded_at" in body["timestamp_fields"]["sessions"]
+            assert body["mqtt"] == {"enabled": False}
+
+    _run(scenario())
+
+
+def test_capabilities_mqtt_enabled(tmp_path):
+    mqtt_config = replace(DEFAULT_MQTT_CONFIG, enabled=True, host="broker", topic_prefix="o2ring")
+    app = _build(_make_db(tmp_path), mqtt_config=mqtt_config)
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/v1/capabilities")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["mqtt"] == {"enabled": True, "topic_pattern": "o2ring/<address>/state"}
+
+    _run(scenario())
+
+
+def test_capabilities_requires_no_auth(tmp_path):
+    api_config = replace(DEFAULT_API_CONFIG, token="secret")
+    app = _build(_make_db(tmp_path), api_config=api_config)
+
+    async def scenario():
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/v1/capabilities")
+            assert resp.status == 200
 
     _run(scenario())
 
@@ -101,7 +149,7 @@ def test_latest(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/latest")
+            resp = await client.get("/api/v1/latest")
             assert resp.status == 200
             body = await resp.json()
             assert body["spo2"] == 97
@@ -116,7 +164,7 @@ def test_latest_no_data(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/latest")
+            resp = await client.get("/api/v1/latest")
             assert resp.status == 404
 
     _run(scenario())
@@ -127,7 +175,7 @@ def test_sessions_empty(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/sessions")
+            resp = await client.get("/api/v1/sessions")
             assert resp.status == 200
             assert await resp.json() == []
 
@@ -139,7 +187,7 @@ def test_report_pdf(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/report?format=pdf")
+            resp = await client.get("/api/v1/report?format=pdf")
             assert resp.status == 200
             assert resp.content_type == "application/pdf"
 
@@ -151,7 +199,7 @@ def test_report_invalid_format(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/report?format=xml")
+            resp = await client.get("/api/v1/report?format=xml")
             assert resp.status == 400
 
     _run(scenario())
@@ -164,7 +212,7 @@ def test_report_no_data(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/report?format=pdf")
+            resp = await client.get("/api/v1/report?format=pdf")
             assert resp.status == 404
 
     _run(scenario())
@@ -175,7 +223,7 @@ def test_session_records_requires_filename(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/session-records")
+            resp = await client.get("/api/v1/session-records")
             assert resp.status == 400
 
     _run(scenario())
@@ -186,7 +234,7 @@ def test_session_records_unknown_filename(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/session-records?filename=nonexistent.vld")
+            resp = await client.get("/api/v1/session-records?filename=nonexistent.vld")
             assert resp.status == 404
 
     _run(scenario())
@@ -197,7 +245,7 @@ def test_session_records_json(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/session-records?filename=20260116233312.vld")
+            resp = await client.get("/api/v1/session-records?filename=20260116233312.vld")
             assert resp.status == 200
             body = await resp.json()
             assert len(body) == 2
@@ -211,7 +259,9 @@ def test_session_records_csv(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/session-records?filename=20260116233312.vld&format=csv")
+            resp = await client.get(
+                "/api/v1/session-records?filename=20260116233312.vld&format=csv"
+            )
             assert resp.status == 200
             assert resp.content_type == "text/csv"
             body = await resp.text()
@@ -226,13 +276,15 @@ def test_health_requires_no_auth_but_latest_does(tmp_path):
 
     async def scenario():
         async with TestClient(TestServer(app)) as client:
-            health = await client.get("/health")
+            health = await client.get("/api/v1/health")
             assert health.status == 200
 
-            unauthorized = await client.get("/latest")
+            unauthorized = await client.get("/api/v1/latest")
             assert unauthorized.status == 401
 
-            authorized = await client.get("/latest", headers={"Authorization": "Bearer secret"})
+            authorized = await client.get(
+                "/api/v1/latest", headers={"Authorization": "Bearer secret"}
+            )
             assert authorized.status == 200
 
     _run(scenario())
