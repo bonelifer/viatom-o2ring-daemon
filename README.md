@@ -276,27 +276,29 @@ Endpoints:
 
 | Method & path | Description |
 |---|---|
-| `GET /health` | Unauthenticated liveness check: `{"status": "ok", "version": "..."}`. |
-| `GET /latest[?address=...]` | Most recent live reading, as JSON. |
-| `GET /sessions[?address=...&limit=...]` | Most recently downloaded sessions, newest first, as JSON. |
-| `GET /session-records?filename=...[&address=...&format=json\|csv]` | One session's raw per-sample records (the every-2-or-4-seconds data behind its summary). JSON by default; `format=csv` returns a file download. |
-| `GET /report[?format=pdf\|csv&period=...&from=...&to=...&address=...]` | Generates a report on demand using the same `[report]` config as `viatom-o2ring-report`, returned as a file download. |
+| `GET /api/v1/health` | Unauthenticated liveness check: `{"status": "ok", "version": "..."}`. |
+| `GET /api/v1/capabilities` | Unauthenticated description of what this daemon exposes (measurement types/modes, profile model, timestamp field meanings, MQTT config), for generic Health Hub-style clients. |
+| `GET /api/v1/latest[?address=...]` | Most recent live reading, as JSON. |
+| `GET /api/v1/sessions[?address=...&limit=...]` | Most recently downloaded sessions, newest first, as JSON. |
+| `GET /api/v1/session-records?filename=...[&address=...&format=json\|csv]` | One session's raw per-sample records (the every-2-or-4-seconds data behind its summary). JSON by default; `format=csv` returns a file download. |
+| `GET /api/v1/report[?format=pdf\|csv&period=...&from=...&to=...&address=...]` | Generates a report on demand using the same `[report]` config as `viatom-o2ring-report`, returned as a file download. |
 
 ```bash
-curl http://127.0.0.1:8080/latest
-curl -o report.pdf "http://127.0.0.1:8080/report?period=30d"
-curl -o session.csv "http://127.0.0.1:8080/session-records?filename=20260116233312.vld&format=csv"
+curl http://127.0.0.1:8080/api/v1/latest
+curl -o report.pdf "http://127.0.0.1:8080/api/v1/report?period=30d"
+curl -o session.csv "http://127.0.0.1:8080/api/v1/session-records?filename=20260116233312.vld&format=csv"
 ```
 
 **There's no TLS built in.** `host` defaults to `127.0.0.1` (loopback only)
 for a reason: don't bind it to `0.0.0.0` or a LAN-facing interface without
 putting a reverse proxy (with TLS and its own auth) in front of it. Setting
 `api.token` requires an `Authorization: Bearer <token>` header on every
-endpoint except `/health`, which is worth doing even on loopback if other
-local users/processes on the same host shouldn't see readings:
+endpoint except `/api/v1/health` and `/api/v1/capabilities`, which is worth
+doing even on loopback if other local users/processes on the same host
+shouldn't see readings:
 
 ```bash
-curl -H "Authorization: Bearer <token>" http://127.0.0.1:8080/latest
+curl -H "Authorization: Bearer <token>" http://127.0.0.1:8080/api/v1/latest
 ```
 
 If `api.host` isn't a loopback address and `api.token` is blank, both
@@ -487,8 +489,8 @@ viatom-o2ring-report --config /etc/viatom-o2ring-daemon/config.ini \
 `--export-session` ignores `--format`/`--period`/`--from`/`--to` -- it
 always writes CSV, and `--output` still applies (default:
 `<filename>-records.csv`). The same data is available live via the HTTP
-API's `GET /session-records?filename=...` (JSON by default, `format=csv`
-for a file download); see [HTTP API](#http-api).
+API's `GET /api/v1/session-records?filename=...` (JSON by default,
+`format=csv` for a file download); see [HTTP API](#http-api).
 
 ## Pruning old data
 

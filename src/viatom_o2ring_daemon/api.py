@@ -17,10 +17,12 @@ from aiohttp import web
 
 from ._version import __version__
 from .config import (
+    DEFAULT_MQTT_CONFIG,
     ApiConfig,
     ConfigError,
     load_api_config,
     load_config,
+    load_mqtt_config,
     load_profile_config,
     load_report_config,
 )
@@ -146,12 +148,55 @@ def _require_auth(request: web.Request) -> web.Response | None:
 
 
 async def handle_health(request: web.Request) -> web.Response:
-    """GET /health -- unauthenticated liveness check."""
+    """GET /api/v1/health -- unauthenticated liveness check."""
     return web.json_response({"status": "ok", "version": __version__})
 
 
+async def handle_capabilities(request: web.Request) -> web.Response:
+    """GET /api/v1/capabilities -- unauthenticated description of what this daemon exposes.
+
+    Lets a generic Health Hub-style client discover what this daemon can do
+    without hardcoding per-daemon assumptions: which measurement types it
+    reports, whether it supports spot readings, full sessions, or both, how
+    its single-profile model differs from daemons that tag measurements to
+    a profile after the fact, what its timestamp fields actually mean, and
+    whether MQTT publishing is turned on.
+    """
+    mqtt_config = request.app["mqtt_config"]
+    if mqtt_config.enabled:
+        mqtt = {
+            "enabled": True,
+            "topic_pattern": f"{mqtt_config.topic_prefix}/<address>/state",
+        }
+    else:
+        mqtt = {"enabled": False}
+
+    return web.json_response(
+        {
+            "daemon": "viatom-o2ring",
+            "api_version": "v1",
+            "measurement_types": ["spo2", "pulse"],
+            "measurement_modes": ["spot", "session"],
+            "profile_model": "single",
+            "timestamp_fields": {
+                "live_readings": {
+                    "recorded_at": "when the spot reading was taken -- arrival "
+                    "and measurement time are the same, since it's live",
+                },
+                "sessions": {
+                    "start_time": "when the recording session started, as measured "
+                    "by the device",
+                    "downloaded_at": "when the completed session was downloaded "
+                    "from the device and received by this daemon",
+                },
+            },
+            "mqtt": mqtt,
+        }
+    )
+
+
 async def handle_latest(request: web.Request) -> web.Response:
-    """GET /latest[?address=...] -- most recent live reading, as JSON."""
+    """GET /api/v1/latest[?address=...] -- most recent live reading, as JSON."""
     unauthorized = _require_auth(request)
     if unauthorized is not None:
         return unauthorized
@@ -163,7 +208,10 @@ async def handle_latest(request: web.Request) -> web.Response:
 
 
 async def handle_sessions(request: web.Request) -> web.Response:
-    """GET /sessions[?address=...&limit=...] -- most recently downloaded sessions, as JSON."""
+    """GET /api/v1/sessions[?address=...&limit=...] -- most recently downloaded sessions.
+
+    Returned newest first, as JSON.
+    """
     unauthorized = _require_auth(request)
     if unauthorized is not None:
         return unauthorized
@@ -180,11 +228,11 @@ async def handle_sessions(request: web.Request) -> web.Response:
 
 
 async def handle_session_records(request: web.Request) -> web.Response:
-    """GET /session-records?filename=...[&address=...&format=json|csv].
+    """GET /api/v1/session-records?filename=...[&address=...&format=json|csv].
 
     Returns one downloaded session's raw per-sample records -- the
-    every-2-or-4-seconds data the /sessions summary was computed from.
-    Defaults to JSON; ``format=csv`` returns a file download instead,
+    every-2-or-4-seconds data the /api/v1/sessions summary was computed
+    from. Defaults to JSON; ``format=csv`` returns a file download instead,
     matching what ``viatom-o2ring-report --export-session`` writes.
     """
     unauthorized = _require_auth(request)
@@ -239,7 +287,7 @@ async def handle_session_records(request: web.Request) -> web.Response:
 
 
 async def handle_report(request: web.Request) -> web.Response:
-    """GET /report[?format=pdf|csv&period=...&from=...&to=...&address=...].
+    """GET /api/v1/report[?format=pdf|csv&period=...&from=...&to=...&address=...].
 
     Generates a report on demand using the same config-driven settings as
     ``viatom-o2ring-report`` and returns it as a file download.
@@ -297,7 +345,11 @@ async def handle_report(request: web.Request) -> web.Response:
 
 
 def build_app(
-    db_path: str, api_config: ApiConfig, report_config, profile_config
+    db_path: str,
+    api_config: ApiConfig,
+    report_config,
+    profile_config,
+    mqtt_config=DEFAULT_MQTT_CONFIG,
 ) -> web.Application:
     """Build the aiohttp application with routes and shared state attached.
 
@@ -306,6 +358,9 @@ def build_app(
         api_config: Supplies the auth token.
         report_config: Used for on-demand report generation.
         profile_config: Supplies the wearer's report personalization.
+        mqtt_config: Supplies MQTT settings surfaced by /api/v1/capabilities.
+            Defaults to MQTT disabled, matching a config file with no
+            ``[mqtt]`` section.
 
     Returns:
         A configured, unstarted aiohttp Application.
@@ -315,11 +370,13 @@ def build_app(
     app["api_token"] = api_config.token
     app["report_config"] = report_config
     app["profile_config"] = profile_config
-    app.router.add_get("/health", handle_health)
-    app.router.add_get("/latest", handle_latest)
-    app.router.add_get("/sessions", handle_sessions)
-    app.router.add_get("/session-records", handle_session_records)
-    app.router.add_get("/report", handle_report)
+    app["mqtt_config"] = mqtt_config
+    app.router.add_get("/api/v1/health", handle_health)
+    app.router.add_get("/api/v1/capabilities", handle_capabilities)
+    app.router.add_get("/api/v1/latest", handle_latest)
+    app.router.add_get("/api/v1/sessions", handle_sessions)
+    app.router.add_get("/api/v1/session-records", handle_session_records)
+    app.router.add_get("/api/v1/report", handle_report)
     return app
 
 
@@ -355,6 +412,7 @@ def main(argv: list[str] | None = None) -> int:
         api_config = load_api_config(args.config)
         report_config = load_report_config(args.config)
         profile_config = load_profile_config(args.config)
+        mqtt_config = load_mqtt_config(args.config)
     except ConfigError as exc:
         print(f"Error: {exc}")
         return 1
@@ -372,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     ensure_schema(db_path)
-    app = build_app(db_path, api_config, report_config, profile_config)
+    app = build_app(db_path, api_config, report_config, profile_config, mqtt_config)
     print(f"Listening on http://{api_config.host}:{api_config.port}")
     web.run_app(app, host=api_config.host, port=api_config.port, print=None)
     return 0
