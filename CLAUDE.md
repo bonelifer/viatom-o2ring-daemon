@@ -2,7 +2,7 @@
 
 ## Related repos to watch
 
-- **viatom-o2ring-ble** -- https://github.com/bonelifer/viatom-o2ring-ble --
+- **viatom-o2ring-ble** -- https://github.com/home-health-hub/viatom-o2ring-ble --
   this daemon's own BLE protocol library, pulled as a `git+https` dependency
   in `pyproject.toml` (not a versioned PyPI release). A fix or feature added
   there doesn't reach this daemon automatically: it needs
@@ -28,7 +28,7 @@
   `mode`/`percent_below_90pct`/`steps` (which OxyIIFileHeader doesn't
   have) already tolerated NULL from legacy sessions missing a field too.
 
-- **etekcity-bp-daemon** -- https://github.com/bonelifer/etekcity-bp-daemon
+- **etekcity-bp-daemon** -- https://github.com/home-health-hub/etekcity-bp-daemon
   -- the closest architectural sibling: also a continuous-BLE-monitoring
   device daemon (as opposed to trividia-truemetrix-daemon's docked/batch
   USB HID sync pattern), so this project's config/storage/cli/alerting/api
@@ -42,7 +42,7 @@
   no BP-daemon analog, for downloading stored `.vld` session files from the
   ring's onboard memory -- a capability BP monitors don't have.
 
-- **etekcity-scale-daemon** -- https://github.com/bonelifer/etekcity-scale-daemon
+- **etekcity-scale-daemon** -- https://github.com/home-health-hub/etekcity-scale-daemon
   -- the original architecture template the whole daemon family
   (`etekcity-bp-daemon`, `trividia-truemetrix-daemon`, and this one) was
   deliberately modeled on. Not a code dependency, just a design reference.

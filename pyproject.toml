@@ -10,7 +10,7 @@ readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">=3.11"
 dependencies = [
-    "viatom-o2ring-ble @ git+https://github.com/bonelifer/viatom-o2ring-ble.git",
+    "viatom-o2ring-ble @ git+https://github.com/home-health-hub/viatom-o2ring-ble.git",
     "aiomqtt>=2.0.0,<3.0.0",
     "apprise>=1.0.0,<2.0.0",
     "aiohttp>=3.9.0,<4.0.0",
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bonelifer/viatom-o2ring-daemon"
+Homepage = "https://github.com/home-health-hub/viatom-o2ring-daemon"
 
 [project.scripts]
 viatom-o2ring-daemon = "viatom_o2ring_daemon.cli:main"
