@@ -7,7 +7,7 @@ overnight/session recordings from the ring's onboard memory. No cloud
 account, no companion app required.
 
 It's a thin wrapper around the
-[`viatom-o2ring-ble`](https://github.com/bonelifer/viatom-o2ring-ble)
+[`viatom-o2ring-ble`](https://github.com/home-health-hub/viatom-o2ring-ble)
 library, packaged to run unattended as a `systemd` service on something like
 a Raspberry Pi sitting near the ring.
 
@@ -109,7 +109,7 @@ Requires Python 3.11+.
 ### Quick install
 
 ```bash
-git clone https://github.com/bonelifer/viatom-o2ring-daemon.git
+git clone https://github.com/home-health-hub/viatom-o2ring-daemon.git
 cd viatom-o2ring-daemon
 sudo ./install.sh
 ```
@@ -361,7 +361,7 @@ docker compose up -d
 ```
 
 Or use the prebuilt image instead of `docker compose build`'s local build:
-`ghcr.io/bonelifer/viatom-o2ring-daemon:latest`. CI builds this image on
+`ghcr.io/home-health-hub/viatom-o2ring-daemon:latest`. CI builds this image on
 every push to `main`, runs `--check-config` and a report generation inside
 it, and pushes it to GHCR, so the image itself is exercised, but only its
 CLI tooling, not a live BLE connection (see below).
@@ -541,15 +541,15 @@ SQLite.
 ## Acknowledgments
 
 - Built on
-  [`viatom-o2ring-ble`](https://github.com/bonelifer/viatom-o2ring-ble),
+  [`viatom-o2ring-ble`](https://github.com/home-health-hub/viatom-o2ring-ble),
   which cross-checks five independent community/official sources for its
   legacy-protocol decoding, and separately ports its O2Ring-S (OxyII)
   support from
   [nglessner/o2ring-s-protocol](https://github.com/nglessner/o2ring-s-protocol)
   -- see that repo's README and `CLAUDE.md`.
 - Project layout modeled on
-  [`etekcity-scale-daemon`](https://github.com/bonelifer/etekcity-scale-daemon)
-  and [`etekcity-bp-daemon`](https://github.com/bonelifer/etekcity-bp-daemon).
+  [`etekcity-scale-daemon`](https://github.com/home-health-hub/etekcity-scale-daemon)
+  and [`etekcity-bp-daemon`](https://github.com/home-health-hub/etekcity-bp-daemon).
 - Code review, implementation, and documentation assisted by
   [Claude](https://www.anthropic.com/claude).
 
@@ -557,8 +557,8 @@ SQLite.
 
 Contributions are welcome!
 
-- **Bug reports**: [Open an issue](https://github.com/bonelifer/viatom-o2ring-daemon/issues).
-- **Everything else** (questions, feature requests, ideas, general discussion): [Use Discussions](https://github.com/bonelifer/viatom-o2ring-daemon/discussions).
+- **Bug reports**: [Open an issue](https://github.com/home-health-hub/viatom-o2ring-daemon/issues).
+- **Everything else** (questions, feature requests, ideas, general discussion): [Use Discussions](https://github.com/home-health-hub/viatom-o2ring-daemon/discussions).
 - Pull requests are welcome for bug fixes or discussed features.
 
 ## License
