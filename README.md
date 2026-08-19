@@ -1,5 +1,7 @@
 # viatom-o2ring-daemon
 
+![viatom-o2ring-daemon: pulse oximeter ring data over Bluetooth to a local home server and database](docs/images/viatom-o2ring-daemon-banner.png)
+
 A standalone Linux daemon that connects to a Viatom/Wellue O2Ring (and
 related ring-family) pulse oximeter over Bluetooth Low Energy (BLE), logs
 live SpO2/pulse readings to a local SQLite database, and downloads stored
