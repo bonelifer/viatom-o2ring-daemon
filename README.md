@@ -2,6 +2,10 @@
 
 ![viatom-o2ring-daemon: pulse oximeter ring data over Bluetooth to a local home server and database](docs/images/viatom-o2ring-daemon-banner.png)
 
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white) ![Bash](https://img.shields.io/badge/shell-Bash-4EAA25?logo=gnu-bash&logoColor=white) ![Docker](https://img.shields.io/badge/container-Docker-2496ED?logo=docker&logoColor=white) ![Bluetooth LE](https://img.shields.io/badge/Bluetooth-LE-0082FC?logo=bluetooth&logoColor=white)
+
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](https://github.com/home-health-hub/viatom-o2ring-daemon/blob/main/LICENSE) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/home-health-hub/viatom-o2ring-daemon#contributing) [![Discussions](https://img.shields.io/badge/discussions-welcome-blue)](https://github.com/home-health-hub/viatom-o2ring-daemon/discussions)
+
 A standalone Linux daemon that connects to a Viatom/Wellue O2Ring (and
 related ring-family) pulse oximeter over Bluetooth Low Energy (BLE), logs
 live SpO2/pulse readings to a local SQLite database, and downloads stored
