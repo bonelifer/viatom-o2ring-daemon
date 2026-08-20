@@ -6,8 +6,7 @@
   this daemon's own BLE protocol library, pulled as a `git+https` dependency
   in `pyproject.toml` (not a versioned PyPI release). A fix or feature added
   there doesn't reach this daemon automatically: it needs
-  `pip install --upgrade` (or a fresh `docker build`, which always re-clones
-  at build time) to pick it up. See that repo's own `CLAUDE.md` for the five
+  `pip install --upgrade` to pick it up. See that repo's own `CLAUDE.md` for the five
   upstream sources *it* tracks -- a protocol fix there flows through this
   one too, eventually. That library is also still unverified against real
   hardware as of this writing, which this daemon inherits.
@@ -73,8 +72,7 @@
 from `viatom-o2ring-ble`'s own unverified status (see that repo's
 `CLAUDE.md`). Unit tests cover config/storage/report/alerting/api/prune/cli
 logic against fixture data and a mocked BLE client (`sync_files.py`'s
-tests), and the Docker image is CI-verified end to end (real `docker build`
-+ `docker run`, not just "`pip install .` succeeds" -- see
+tests), and CI runs a real smoke test against the installed package (see
 `.github/workflows/ci.yml`), but nothing in CI can exercise the actual BLE
 path -- connecting to a real O2Ring-family device, streaming live readings,
 or downloading a real `.vld` file -- which hasn't been tested yet.
