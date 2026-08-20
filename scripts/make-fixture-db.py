@@ -2,9 +2,8 @@
 """Create a tiny fixture SQLite database for smoke/CI testing.
 
 The schema here is duplicated from storage.py's _SCHEMA rather than
-imported, so this script has no dependency on the package being installed
-(the docker-build CI job runs it against a container image, not the host
-Python). Keep the two in sync if the tables' columns change.
+imported, so this script has no dependency on the package being installed.
+Keep the two in sync if the tables' columns change.
 """
 
 import sqlite3
